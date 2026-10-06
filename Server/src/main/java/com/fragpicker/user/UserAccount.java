@@ -3,6 +3,8 @@ package com.fragpicker.user;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 
 import java.time.LocalDateTime;
 
@@ -16,7 +18,9 @@ public class UserAccount {
     private String businessZone;
     private Boolean enabled;
     private Integer tokenVersion;
+    @TableField(updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime createdAt;
+    @TableField(updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime updatedAt;
 
     public Long getId() { return id; }

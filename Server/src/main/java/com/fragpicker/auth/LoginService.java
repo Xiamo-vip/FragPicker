@@ -18,13 +18,13 @@ import java.util.UUID;
 public class LoginService {
     private final UserAccountMapper users;
     private final PasswordEncoder passwords;
-    private final JwtTokenService tokens;
+    private final SessionTokenService sessions;
     private final String dummyHash;
 
-    public LoginService(UserAccountMapper users, PasswordEncoder passwords, JwtTokenService tokens) {
+    public LoginService(UserAccountMapper users, PasswordEncoder passwords, SessionTokenService sessions) {
         this.users = users;
         this.passwords = passwords;
-        this.tokens = tokens;
+        this.sessions = sessions;
         this.dummyHash = passwords.encode(UUID.randomUUID().toString());
     }
 
@@ -34,7 +34,7 @@ public class LoginService {
                 .eq(UserAccount::getUsernameNormalized, request.username().toLowerCase(Locale.ROOT)));
         boolean matched = passwords.matches(request.password(), user == null ? dummyHash : user.getPasswordHash());
         if (!matched || user == null || !Boolean.TRUE.equals(user.getEnabled())) { throw invalidCredentials(); }
-        return new AuthResponse(tokens.issueAccessToken(user), "Bearer", tokens.expiresInSeconds(), UserResponse.from(user));
+        return sessions.create(user.getId());
     }
 
     private ApiException invalidCredentials() {

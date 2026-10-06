@@ -56,6 +56,10 @@ public class SecurityConfiguration {
         if (ttl == null || ttl.compareTo(Duration.ofSeconds(1)) < 0 || ttl.compareTo(Duration.ofDays(1)) > 0) {
             throw new IllegalStateException("JWT_ACCESS_TOKEN_TTL must be between 1 second and 1 day");
         }
+        var refreshTtl = properties.refreshTokenTtl();
+        if (refreshTtl == null || refreshTtl.compareTo(ttl) < 0 || refreshTtl.compareTo(Duration.ofDays(90)) > 0) {
+            throw new IllegalStateException("JWT_REFRESH_TOKEN_TTL must be at least the access token TTL and at most 90 days");
+        }
         return new SecretKeySpec(key, "HmacSHA256");
     }
 
@@ -80,7 +84,7 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(request -> request
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/error").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(token -> {
                     try {

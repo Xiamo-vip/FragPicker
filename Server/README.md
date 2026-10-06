@@ -63,7 +63,13 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 
 签名采用 HS256，`JWT_SIGNING_KEY` 必须是至少32随机字节的 Base64 编码值，没有默认密钥。鉴权检查签名、过期时间、发行方、受众、账号状态和数据库中的令牌版本。错误密码和不存在账号统一返回 401 / `INVALID_CREDENTIALS`。
 
-`bootstrap` 仅用于健康检查，不加载业务接口。实际 `database` profile 的业务接口默认需要鉴权，仅注册、登录和健康检查公开。
+`bootstrap` 仅用于健康检查，不加载业务接口。实际 `database` profile 的业务接口默认需要鉴权，仅注册、登录、刷新和健康检查公开。
+
+## 刷新令牌
+
+登录响应额外包含 `refreshToken` 和 `refreshExpiresIn`。`POST /api/v1/auth/refresh` 接收 `{"refreshToken":"<token>"}`，成功返回新的访问/刷新令牌。该请求不携带旧的 Authorization 头。
+
+刷新令牌有效期默认30天，轮换保留初次登录的绝对到期时间；每个令牌仅能使用一次，数据库只存 SHA-256 哈希。已使用令牌再次提交会撤销该用户所有会话并立即使已有访问令牌失效，要求重新登录。Android 会串行化刷新请求，避免并发误用旧令牌。
 
 ## 环境变量配置
 
@@ -75,6 +81,7 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | DB_URL / DB_USERNAME / DB_PASSWORD | 本机 MySQL 连接与账号 |
 | JWT_SIGNING_KEY | 至少32字节随机密钥的 Base64 值 |
 | JWT_ACCESS_TOKEN_TTL | 访问令牌时长，默认15分钟 |
+| JWT_REFRESH_TOKEN_TTL | 刷新会话绝对有效期，默认30天 |
 | PARSEVIDEO_BASE_URL | 已部署的视频解析服务地址 |
 | TINGWU_APP_KEY | 听悟应用 AppKey |
 | OSS_BUCKET / OSS_ENDPOINT | 私有对象存储 Bucket 与 Endpoint |
