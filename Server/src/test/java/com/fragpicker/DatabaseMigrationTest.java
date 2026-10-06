@@ -25,6 +25,7 @@ class DatabaseMigrationTest {
     @Autowired private UserAccountMapper users;
     @Autowired private Flyway flyway;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.zaxxer.hikari.HikariDataSource dataSource;
 
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
@@ -35,6 +36,8 @@ class DatabaseMigrationTest {
 
     @Test
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
+        assertThat(dataSource.getMaximumPoolSize()).isEqualTo(4);
+        assertThat(dataSource.getMinimumIdle()).isZero();
         assertThat(flyway.info().current().getVersion().toString()).isEqualTo("8");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
