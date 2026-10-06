@@ -5,6 +5,11 @@ spring:
     default: bootstrap
   jackson:
     time-zone: UTC
+  task:
+    scheduling:
+      thread-name-prefix: fragpicker-scheduled-
+      pool:
+        size: ${SCHEDULER_POOL_SIZE:8}
 
 server:
   port: ${SERVER_PORT:8080}
