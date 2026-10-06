@@ -34,6 +34,13 @@ management:
 fragpicker:
   business-zone: Asia/Shanghai
   knowledge:
+    index:
+      enabled: ${KNOWLEDGE_INDEX_ENABLED:false}
+      poll-delay: ${INDEX_POLL_DELAY:2s}
+      lease-duration: ${INDEX_LEASE_DURATION:10m}
+      max-attempts: ${INDEX_MAX_ATTEMPTS:3}
+      retry-base-delay: ${INDEX_RETRY_BASE_DELAY:10s}
+      max-chunks: ${INDEX_MAX_CHUNKS:10000}
     enrichment:
       enabled: ${KNOWLEDGE_ENRICHMENT_ENABLED:false}
       poll-delay: ${KNOWLEDGE_POLL_DELAY:2s}

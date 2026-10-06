@@ -35,7 +35,7 @@ class DatabaseMigrationTest {
 
     @Test
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("6");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("7");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))
@@ -94,6 +94,12 @@ class DatabaseMigrationTest {
                     assertThat(row.next()).isTrue(); assertThat(row.getString("summary")).isEqualTo("原始导数摘要");
                     assertThat(row.getString("keywords")).contains("导数"); assertThat(row.getString("enriched_summary")).isNull();
                     assertThat(row.getString("categories")).isNull(); assertThat(row.getInt("knowledge_attempt_count")).isZero();
+                }
+                assertThat(Flyway.configure().dataSource(url, username, password).target("7").load().migrate().migrationsExecuted).isEqualTo(1);
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement();
+                     var row = statement.executeQuery("SELECT j.stage, j.index_attempt_count, k.summary FROM ingestion_jobs j JOIN fragment_knowledge k ON k.fragment_id = j.fragment_id WHERE j.id = 1")) {
+                    assertThat(row.next()).isTrue(); assertThat(row.getString("stage")).isEqualTo("TRANSCRIPTION_PENDING");
+                    assertThat(row.getInt("index_attempt_count")).isZero(); assertThat(row.getString("summary")).isEqualTo("原始导数摘要");
                 }
             } finally { ddl.execute("DROP DATABASE " + schema); }
         }

@@ -16,6 +16,7 @@ public class IngestionJob {
     private Integer mediaAttemptCount;
     private Integer transcriptionFailures;
     private Integer knowledgeAttemptCount;
+    private Integer indexAttemptCount;
     private LocalDateTime nextAttemptAt;
     private String leaseOwner;
     private LocalDateTime leaseExpiresAt;
@@ -39,6 +40,8 @@ public class IngestionJob {
     public void setTranscriptionFailures(Integer value) { transcriptionFailures = value; }
     public Integer getKnowledgeAttemptCount() { return knowledgeAttemptCount; }
     public void setKnowledgeAttemptCount(Integer value) { knowledgeAttemptCount = value; }
+    public Integer getIndexAttemptCount() { return indexAttemptCount; }
+    public void setIndexAttemptCount(Integer value) { indexAttemptCount = value; }
     public LocalDateTime getNextAttemptAt() { return nextAttemptAt; }
     public void setNextAttemptAt(LocalDateTime value) { nextAttemptAt = value; }
     public String getLeaseOwner() { return leaseOwner; }
