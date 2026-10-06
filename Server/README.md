@@ -75,6 +75,10 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 
 `POST /api/v1/auth/logout` 使用当前访问令牌鉴权，不接收用户 ID。成功返回 HTTP 204，撤销当前账号全部刷新会话并递增令牌版本，因此访问令牌立即失效；其他账号不受影响。Android 客户端应在退出后清理本地会话。重复提交已撤销令牌返回 401。
 
+## 当前用户
+
+`GET /api/v1/users/me` 携带访问令牌，返回当前用户的 `id`、`username`、`businessZone`，不接受其他用户 ID，不返回密码或哈希。
+
 ## 环境变量
 
 `application.yml` 中的凭据只引用环境变量。测试 AppKey、Bucket 和 AccessKey 同样通过环境变量配置，不提交真实值。
