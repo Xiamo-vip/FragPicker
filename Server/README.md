@@ -91,6 +91,9 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | JWT_ACCESS_TOKEN_TTL | 访问令牌时长，默认15分钟 |
 | JWT_REFRESH_TOKEN_TTL | 刷新会话绝对有效期，默认30天 |
 | INGESTION_ALLOWED_HOSTS | 逗号分隔的投喂平台域名，与解析服务路由同步 |
+| INGESTION_WORKER_ENABLED | 自动解析投喂任务，默认 false，须同时启用 parsevideo |
+| INGESTION_POLL_DELAY / INGESTION_LEASE_DURATION | 领取间隔 / 租约时长，默认2秒 / 5分钟 |
+| INGESTION_MAX_ATTEMPTS / INGESTION_RETRY_BASE_DELAY | 解析尝试上限 / 退避基数，默认3次 / 10秒 |
 | PARSEVIDEO_ENABLED / PARSEVIDEO_BASE_URL | 启用解析客户端（默认 false）及服务根地址 |
 | PARSEVIDEO_CONNECT_TIMEOUT / PARSEVIDEO_READ_TIMEOUT | 连接与读取超时，默认5秒 / 45秒 |
 | PARSEVIDEO_MAX_RESPONSE_BYTES | 解析响应上限，默认1 MiB |
@@ -143,8 +146,22 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 
 记录、任务、幂等凭证在同一事务入库。同一键与同一规范化链接/备注重试返回已有记录；同一键提交不同内容返回409 `IDEMPOTENCY_CONFLICT`。同一用户重复链接返回已有记录，不新增任务，也不替换原备注和归属日期；其他用户拥有独立记录。规范化只调整协议/主机大小写、默认端口和片段，不删除或重排查询参数，以免破坏分享链接。平台资源 ID 去重在解析阶段继续补充。
 
-当前任务持久化为 `QUEUED`，此接口不调用云服务。异步租约、媒体保存、转写和增强按后续独立模块接入；排队成功不等同于视频已总结完成。真实 MySQL 测试覆盖幂等、并发、用户隔离与任务写入失败时的事务回滚。
+当前任务持久化为 `QUEUED`，此接口不调用云服务。后台解析通过下面的工作线程处理；媒体保存、转写和增强按后续独立模块接入。排队成功不等同于视频已总结完成。真实 MySQL 测试覆盖幂等、并发、用户隔离与任务写入失败时的事务回滚。
 
 ## 投喂状态查询
 
-`GET /api/v1/fragments/{id}` 使用 Bearer 鉴权，返回当前用户的原链接、域名、备注、归属日期与时区、UTC 创建时间、处理阶段、尝试次数及稳定错误码。接口不接受查询参数中的用户身份；其他用户的记录与不存在的记录统一返回404。响应禁止缓存，不公开任务租约、工作线程身份或内部哈希。现阶段新投喂状态为 `QUEUED`，由后续工作线程更新。
+`GET /api/v1/fragments/{id}` 使用 Bearer 鉴权，返回当前用户的原链接、域名、备注、归属日期与时区、UTC 创建时间、处理阶段、尝试次数及稳定错误码。接口不接受查询参数中的用户身份；其他用户的记录与不存在的记录统一返回404。响应禁止缓存，不公开任务租约、工作线程身份或内部哈希。
+
+## 后台视频解析任务
+
+在 `database` profile 中设置 `PARSEVIDEO_ENABLED=true`、`PARSEVIDEO_BASE_URL` 和 `INGESTION_WORKER_ENABLED=true` 后，自动按固定间隔领取任务。默认状态流程为 `QUEUED → PARSING → MEDIA_PENDING`；`MEDIA_PENDING` 表示已保存解析元数据，等待后续私有 OSS 保存阶段。工作线程关闭时投喂仍可入库，但保持排队。
+
+使用 MySQL `FOR UPDATE SKIP LOCKED` 领取一条任务；领取事务结束后才请求解析服务，网络等待不持有数据库锁。每次领取递增尝试次数和版本，并分配随机租约标识。租约时间以数据库 UTC 为准；进程崩溃后过期任务可重新领取。成功或失败回写都核对用户、任务、版本、租约及到期时间，过期旧线程不能覆盖新结果。解析成功时元数据、任务阶段和投喂状态在同一事务提交。
+
+`fragment_video_metadata` 保存实际标题、视频地址、封面、作者名称、作者 ID 和头像；缺失的可选字段为空。这里的地址可能是短期签名 URL，仅供后续媒体阶段使用，不代表已经长期保存，也不直接返回给客户端。平台资源 ID 去重仍待补充（作者 ID 不是视频 ID）。
+
+临时错误重排到 `QUEUED`，按基数的指数退避，最长1小时；默认最多3次领取。永久错误或次数用尽转为 `FAILED`。错误码使用 `PARSE_` 前缀；崩溃导致最后一次租约到期记录 `PARSE_LEASE_EXPIRED`。不会记录供应商原始错误消息、媒体签名 URL 或请求内容。轮询异常保留可恢复租约。
+
+领取间隔允许250毫秒～1分钟，租约15秒～10分钟，尝试次数1～10，退避基数1秒～10分钟。启用时租约至少超过连接和读取空闲超时之和5秒；持续输出的 HTTP 响应可能超过空闲超时，最终仍由租约校验拒绝过期结果。配置不满足约束则启动失败。
+
+真实 MySQL 测试覆盖并发单次领取、跳过被锁任务、过期租约隔离、重试上限、永久失败、崩溃恢复和元数据事务回滚；设置 `PARSEVIDEO_TEST_BASE_URL` 还验证真实部署服务到数据库的解析链路。OSS 和听悟链路尚未完成，不应将 `MEDIA_PENDING` 展示为总结成功。
