@@ -126,7 +126,11 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 
 [DeepSeek 接口文档](https://api-docs.deepseek.com/zh-cn/)提供当前模型名称；模型名通过环境配置，不在代码中固定。embedding 使用 LangChain4j 本地模型的独立模块，不使用聊天 API Key。
 
-本次模型适配器通过本机 HTTP 契约测试覆盖普通回复、工具参数和推理字段保留、流式结束与错误、超时及无自动重试；这些测试不代表已完成真实 DeepSeek 验证。尚未提供对话业务接口、历史检索 Tools 或消息持久化，它们按后续独立模块交付。
+本机 HTTP 契约测试覆盖普通回复、工具参数和推理字段保留、流式结束与错误、超时及无自动重试。2026-10-06 使用本机配置的 `deepseek-flash` 完成真实 DeepSeek 验证：中文回复、流式文本与结束回调、工具名称和 JSON 参数、回传工具结果后的续答均通过；本轮聊天模块13项测试全部通过。
+
+真实测试默认跳过，显式设置 `AI_CHAT_TEST_ENABLED=true`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL` 后，在 `Server` 下运行 `./mvnw.cmd "-Dtest=ChatModelLiveIntegrationTest,ChatModelContractTest,ChatModelConfigurationTest" test`。可用 `AI_CHAT_BASE_URL` 切换供应商；测试会发起4次付费模型请求，不做自动重试，只使用合成样例，不输出凭据或供应商原始错误正文。新设置的 Windows 用户环境变量需要重启终端或显式读入当前进程，不能只以旧进程中变量为空判断配置缺失。
+
+工具结果在真实协议测试中为合成数据，尚未提供对话业务接口、数据库检索 Tools 或消息持久化，不能将此项验证视为用户历史检索已经完成。这些业务按后续独立模块交付。
 
 ## 本地中文 embedding
 
