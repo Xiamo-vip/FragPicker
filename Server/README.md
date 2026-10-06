@@ -94,7 +94,21 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | TINGWU_APP_KEY | 听悟应用 AppKey |
 | OSS_BUCKET / OSS_ENDPOINT | 私有对象存储 Bucket 与 Endpoint |
 | ALIBABA_CLOUD_ACCESS_KEY_ID / ALIBABA_CLOUD_ACCESS_KEY_SECRET | 阿里云访问凭据 |
-| AI_API_KEY | 百炼 API Key |
-| AI_CHAT_MODEL / AI_EMBEDDING_MODEL | 百炼聊天与向量模型名称 |
+| AI_CHAT_ENABLED | 启用聊天模型，默认 false |
+| AI_CHAT_BASE_URL | OpenAI 兼容接口根地址，默认 https://api.deepseek.com |
+| AI_CHAT_API_KEY | 当前聊天供应商的 API Key |
+| AI_CHAT_MODEL | 聊天模型名，启用时必填，无默认模型 |
+| AI_CHAT_TIMEOUT | 调用超时，默认60秒，允许1秒～5分钟 |
+| AI_CHAT_MAX_OUTPUT_TOKENS | 最大输出 token 数，默认4096，允许1～32768 |
 
-本模块只声明外部配置占位符，尚未调用这些服务。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
+parsevideo、听悟和 OSS 目前仍为配置占位符。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
+
+## OpenAI 兼容聊天模型
+
+聊天使用 LangChain4j 的 `ChatModel` 和 `StreamingChatModel`，默认供应商地址为 DeepSeek。替换 `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL` 即可切换兼容 Chat Completions 和工具调用的供应商；Base URL 是接口根地址，不应包含 `/chat/completions`。可保留供应商要求的 `/v1` 或其他路径前缀。
+
+设置 `AI_CHAT_ENABLED=true` 后，地址、密钥、模型名和请求边界必须有效，否则启动失败。默认关闭时不要求云凭据，也不创建模型客户端。远程地址要求 HTTPS，本机协议测试允许 loopback HTTP。请求/响应日志关闭，同步请求不自动重试；业务层将明确处理付费调用的重试。DeepSeek 的 `reasoning_content` 在工具轮次之间由 SDK 保留，不作为用户可见回答。
+
+[DeepSeek 接口文档](https://api-docs.deepseek.com/zh-cn/)提供当前模型名称；模型名通过环境配置，不在代码中固定。embedding 使用 LangChain4j 本地模型的独立模块，不使用聊天 API Key。
+
+本次模型适配器通过本机 HTTP 契约测试覆盖普通回复、工具参数和推理字段保留、流式结束与错误、超时及无自动重试；这些测试不代表已完成真实 DeepSeek 验证。尚未提供对话业务接口、历史检索 Tools 或消息持久化，它们按后续独立模块交付。

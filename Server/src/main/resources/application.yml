@@ -37,7 +37,10 @@ fragpicker:
     aliyun:
       access-key-id: ${ALIBABA_CLOUD_ACCESS_KEY_ID:}
       access-key-secret: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET:}
-    ai:
-      api-key: ${AI_API_KEY:}
-      chat-model: ${AI_CHAT_MODEL:}
-      embedding-model: ${AI_EMBEDDING_MODEL:}
+    chat:
+      enabled: ${AI_CHAT_ENABLED:false}
+      base-url: ${AI_CHAT_BASE_URL:https://api.deepseek.com}
+      api-key: ${AI_CHAT_API_KEY:}
+      model: ${AI_CHAT_MODEL:}
+      timeout: ${AI_CHAT_TIMEOUT:60s}
+      max-output-tokens: ${AI_CHAT_MAX_OUTPUT_TOKENS:4096}
