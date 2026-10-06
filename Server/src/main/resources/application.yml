@@ -34,6 +34,14 @@ management:
 fragpicker:
   business-zone: Asia/Shanghai
   ingestion:
+    transcription-worker:
+      enabled: ${TRANSCRIPTION_WORKER_ENABLED:false}
+      poll-delay: ${TRANSCRIPTION_POLL_DELAY:2s}
+      query-delay: ${TRANSCRIPTION_QUERY_DELAY:1m}
+      lease-duration: ${TRANSCRIPTION_LEASE_DURATION:5m}
+      max-task-age: ${TRANSCRIPTION_MAX_TASK_AGE:24h}
+      max-failures: ${TRANSCRIPTION_MAX_FAILURES:8}
+      retry-base-delay: ${TRANSCRIPTION_RETRY_BASE_DELAY:10s}
     media-worker:
       enabled: ${MEDIA_WORKER_ENABLED:false}
       poll-delay: ${MEDIA_WORKER_POLL_DELAY:2s}

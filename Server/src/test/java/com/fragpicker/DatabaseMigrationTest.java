@@ -35,7 +35,7 @@ class DatabaseMigrationTest {
 
     @Test
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("4");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("5");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))
@@ -59,6 +59,34 @@ class DatabaseMigrationTest {
         users.insert(account("First", "unique_name"));
         assertThatThrownBy(() -> users.insert(account("Second", "unique_name")))
                 .isInstanceOf(DuplicateKeyException.class);
+    }
+
+    @Test
+    void upgradesExistingMediaJobFromV4WithoutLosingItsOwnerOrStage() throws Exception {
+        String schema = "fragpicker_upgrade_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        String original = System.getenv("DB_TEST_URL"); int query = original.indexOf('?');
+        String address = query < 0 ? original : original.substring(0, query);
+        String url = address.substring(0, address.lastIndexOf('/') + 1) + schema + (query < 0 ? "" : original.substring(query));
+        String username = System.getenv("DB_TEST_USERNAME"), password = System.getenv("DB_TEST_PASSWORD");
+        try (var admin = java.sql.DriverManager.getConnection(original, username, password); var ddl = admin.createStatement()) {
+            ddl.execute("CREATE DATABASE " + schema + " CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci");
+            try {
+                Flyway.configure().dataSource(url, username, password).target("4").load().migrate();
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
+                    statement.execute("INSERT INTO users (id, username, username_normalized, password_hash) VALUES (1, 'upgrade', 'upgrade', 'test-placeholder')");
+                    statement.execute("INSERT INTO fragments (id, user_id, source_url, source_hash, source_host, business_date, business_zone, status, created_at) VALUES (1, 1, 'https://b23.tv/test', REPEAT('a', 64), 'b23.tv', '2026-10-06', 'Asia/Shanghai', 'TRANSCRIPTION_PENDING', UTC_TIMESTAMP(3))");
+                    statement.execute("INSERT INTO ingestion_jobs (id, fragment_id, user_id, stage, attempt_count, media_attempt_count, next_attempt_at, created_at) VALUES (1, 1, 1, 'TRANSCRIPTION_PENDING', 2, 1, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))");
+                }
+                assertThat(Flyway.configure().dataSource(url, username, password).load().migrate().migrationsExecuted).isEqualTo(1);
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement();
+                     var row = statement.executeQuery("SELECT user_id, stage, attempt_count, media_attempt_count, transcription_failures FROM ingestion_jobs WHERE id = 1")) {
+                    assertThat(row.next()).isTrue(); assertThat(row.getLong("user_id")).isEqualTo(1);
+                    assertThat(row.getString("stage")).isEqualTo("TRANSCRIPTION_PENDING");
+                    assertThat(row.getInt("attempt_count")).isEqualTo(2); assertThat(row.getInt("media_attempt_count")).isEqualTo(1);
+                    assertThat(row.getInt("transcription_failures")).isZero();
+                }
+            } finally { ddl.execute("DROP DATABASE " + schema); }
+        }
     }
 
     private UserAccount account(String displayName, String normalized) {

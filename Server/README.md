@@ -235,10 +235,37 @@ MySQL 测试验证阶段原子性、断点恢复、来源刷新、有限重试�
 
 真实验证默认跳过。设置 `TINGWU_TEST_ENABLED=true`、`TINGWU_TEST_MEDIA_PATH`（小于5 MiB的合成中文 WAV）、`TINGWU_TEST_CHECKPOINT_PATH`（忽略目录中的独立 JSON 文件）、AppKey、阿里凭据和 OSS 配置，再运行 `./mvnw.cmd "-Dtest=TingwuLiveIntegrationTest,TingwuContractTest,TingwuResultReaderTest,OssStorageContractTest" test`。首次上传合成语音并创建一个付费任务；检查点在提交前写入，后续超时运行复用任务 ID，每15秒查询一次，最多等待5分钟。提交结果不确定时保留检查点并拒绝自动重建；完成后清理本次测试源对象，不删除云端任务记录。
 
-2026-10-06 已验证私有 OSS 输入→真实听悟创建/查询→原文、摘要、关键词与重点结果解析，30.585秒合成中文语音产生3段原文、10个关键词和1个重点；17项本模块及 OSS 兼容验证全部通过。本机 Fake-IP 环境仅对测试 JVM 注入实际 OSS 结果主机的当时公网 DNS 映射，生产限制未放宽。转写工作线程和知识数据库尚未接入，媒体任务仍停在 `TRANSCRIPTION_PENDING`，不能展示为总结完成。
+2026-10-06 已验证私有 OSS 输入→真实听悟创建/查询→原文、摘要、关键词与重点结果解析，30.585秒合成中文语音产生3段原文、10个关键词和1个重点；17项本模块及 OSS 兼容验证全部通过。本机 Fake-IP 环境仅对测试 JVM 注入实际 OSS 结果主机的当时公网 DNS 映射，生产限制未放宽。适配器单独不负责知识入库，业务接续见下节。
 
 新增 SDK 后，完整后端兼容性检查共101项，92项通过、9项真实外部调用在该轮跳过，构建与打包成功；真实聊天、媒体保存和听悟验证均按各自开关单独执行，结果见各模块记录。
 
 若本机 Maven 镜像尚未同步该 SDK，可通过 `mvnw -s <独立 settings.xml>` 临时选择 Maven Central；本轮使用忽略目录中的测试配置，未修改全局 Maven 设置，仓库依赖仍按标准 Maven Central 坐标声明。
 
 协议依据：[离线转写及签名 URL 窗口](https://help.aliyun.com/zh/tingwu/offline-transcribe-of-audio-and-video-files)、[任务查询](https://help.aliyun.com/zh/tingwu/api-tingwu-2023-09-30-gettaskinfo)、[转写结构](https://help.aliyun.com/zh/tingwu/voice-transcription)、[摘要结构](https://help.aliyun.com/zh/tingwu/large-model-summary/)。
+
+## 持久化转写任务与知识结果
+
+V5 迁移为已有队列增加阶段独立的失败计数，并创建 `fragment_transcriptions`、`fragment_knowledge`、`fragment_sentences`、`fragment_key_points`。所有结果以记录和用户的联合外键隔离，保留原文顺序、说话人、句子 ID 与起止毫秒，以及全文摘要、关键词和重点；不保存输入或结果的签名 URL。删除用户时关联数据按已有外键级联删除，私有 OSS 文件的删除清理需要后续业务单独处理。
+
+启用 `database` profile、`OSS_ENABLED=true`、`TINGWU_ENABLED=true`、`TRANSCRIPTION_WORKER_ENABLED=true` 后自动处理 `TRANSCRIPTION_PENDING`。前两段解析、保存媒体仍分别需要自己的 worker 开关。所有开关默认关闭，避免无凭据启动时产生云调用。
+
+| 环境变量 | 默认值及作用 |
+| --- | --- |
+| TRANSCRIPTION_POLL_DELAY | 2s，本机队列扫描间隔 |
+| TRANSCRIPTION_QUERY_DELAY | 1m，每个已创建云任务的正常查询间隔，允许15秒～10分钟 |
+| TRANSCRIPTION_LEASE_DURATION | 5m，需覆盖云查询及三份结果的超时预算 |
+| TRANSCRIPTION_MAX_TASK_AGE | 24h，从提交意图起计算的等待上限，允许1～72小时 |
+| TRANSCRIPTION_MAX_FAILURES | 8，连续可恢复失败上限，正常 ONGOING 查询会重置 |
+| TRANSCRIPTION_RETRY_BASE_DELAY | 10s，指数退避，最多1小时 |
+
+这些默认值是保护线程和云调用的工程参数，不代表用户每天的投喂额度。任务领取用 `FOR UPDATE SKIP LOCKED`，外部调用在事务之外；版本、租约和所有权隔离失效执行器。创建前先提交关联 TaskKey 的意图，成功后保存唯一云 TaskId；进程重启后只查询该 ID。创建超时、未知接受结果、或响应之后数据库未能保存 ID 时进入 `FAILED / TINGWU_SUBMISSION_UNCERTAIN`，不自动再次 POST。仅确认的参数、鉴权、限流等拒绝可以清除未接受意图，按永久或有限重试处理。
+
+若原执行器晚到的成功响应带回同一意图的 ID，允许恢复为 `TRANSCRIBING`；其余不确定状态需要人工在听悟核对对应 TaskKey，保留数据后再处理，不提供自动重建或管理 API。源链接失效、格式不支持、无语音与超过等待上限都有独立错误码。查询或结果下载可恢复失败复用原任务，`RESULT_EXPIRED` 下次重新 GET 获取结果链接。
+
+完成转写后，摘要、关键词、原文和重点在同一事务中提交，任意一项入库失败全部回滚；随后进入 `KNOWLEDGE_PENDING`。主题分类、语义索引、面向用户的详情和播放 API 尚未完成，因此此状态还不能宣称知识已经可检索。
+
+`Server/scripts/Test-MySql.ps1` 验证并发领取、锁跳过、租约恢复、不确定提交、晚到响应、拒绝重试、查询预算、任务超时、来源隔离及结果整体回滚，也验证 V4 已有媒体任务原样升级到 V5。设置 `TRANSCRIPTION_WORKER_TEST_ENABLED=true`、`TINGWU_TEST_MEDIA_PATH`、`TINGWU_WORKER_TEST_CHECKPOINT_PATH` 和云凭据可开启真实 OSS→听悟 worker→MySQL 测试。独立检查点在付费 POST 前落盘，重跑复用已有任务；成功后清理本次唯一命名空间的源文件和检查点。该测试用小型合成 WAV 直接建立媒体检查点，解析和视频下载的真实验证见前文。
+
+2026-10-06 真实转写业务及配置验证共14项，全部通过；实际摘要、关键词和带时间戳原文已写入隔离 MySQL。仅本次新建的云端测试对象已清理，已有 Bucket、用户数据库及凭据配置未修改。
+
+新增业务模块及升级测试后，完整后端验证共116项，106项通过、10项真实外部调用按开关跳过，构建和打包成功；上面的真实转写业务验证单独执行并已通过。
