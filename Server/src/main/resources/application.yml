@@ -34,6 +34,11 @@ management:
 fragpicker:
   business-zone: Asia/Shanghai
   knowledge:
+    search:
+      max-chunks: ${SEARCH_MAX_CHUNKS:100000}
+      timeout: ${SEARCH_TIMEOUT:15s}
+      min-similarity: ${SEARCH_MIN_SIMILARITY:0.40}
+      literal-boost: ${SEARCH_LITERAL_BOOST:0.10}
     index:
       enabled: ${KNOWLEDGE_INDEX_ENABLED:false}
       poll-delay: ${INDEX_POLL_DELAY:2s}
