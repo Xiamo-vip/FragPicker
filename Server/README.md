@@ -356,8 +356,20 @@ V7 创建 `fragment_indexes` 和 `fragment_index_chunks`，记录用户、模型
 
 `knowledge` 在尚未转写时为 null；已完成转写的记录无论是否增强/索引成功，都能读取已保留资料。它包含毫秒时长、`originalSummaryPreview`、增强 `summary`、增强 `points`、听悟 `keywords`、主题 `categories` 和 UTC 完成/增强时间。增强尚未产生时，summary/enrichedAt 为 null，points/categories 为空；不根据原文虚构摘要或把失败伪装为完成。所有内容查询都带登录用户，附加 userId 无效；不存在与其他用户统一404 `FRAGMENT_NOT_FOUND`，无登录401。
 
-为了让详情首屏响应有界，标题最多500个 Unicode 字符、作者100、原始摘要预览4000、增强摘要2000、增强要点最多8条/每条300、关键词最多100条/每条100。分别返回 `titleTruncated`、`authorTruncated`、`originalSummaryTruncated`、`summaryTruncated`、`pointsTruncated`、`keywordsTruncated`；数据库原始值保持完整。正常增强结果已满足这些展示边界。完整转写与带时间戳重点将在分页接口读取，不在详情首屏一次性加载。客户端应显示预览提示，而不能将标记为截断的字段宣称为全文。
+为了让详情首屏响应有界，标题最多500个 Unicode 字符、作者100、原始摘要预览4000、增强摘要2000、增强要点最多8条/每条300、关键词最多100条/每条100。分别返回 `titleTruncated`、`authorTruncated`、`originalSummaryTruncated`、`summaryTruncated`、`pointsTruncated`、`keywordsTruncated`；数据库原始值保持完整。正常增强结果已满足这些展示边界。完整转写与带时间戳重点通过下节分页接口读取，不在详情首屏一次性加载。客户端应显示预览提示，而不能将标记为截断的字段宣称为全文。
 
 详情和知识读取在只读 REPEATABLE_READ 事务中完成，保持此次响应的处理阶段与资料视图一致；没有模型或云资源调用。数据库 JSON 类型/分类异常返回503 `CONTENT_INVALID`，不回显原始内容或异常正文。API 不返回平台临时资源地址、OSS 对象键、云 TaskId、向量或租约信息。
 
 2026-10-06 详情模块5项真实 HTTP/MySQL 验证全部通过，覆盖已完成与处理中/失败资料、预览边界、补充 Unicode 字符、原文保留、所有权及异常分类；同轮回归状态接口3项和真实语义搜索6项，共14项通过，构建与打包成功。媒体路径测试使用数据库夹具；私有 OSS 与上游转写真实验证见前文各模块记录。
+
+## 带时间戳全文分页 API
+
+`GET /api/v1/fragments/{id}/transcript?kind=SENTENCE&ordinal=0&offset=0&limit=10`，需要 Bearer 登录，响应 `Cache-Control: no-store`。`kind` 默认 SENTENCE（完整转写），也支持 KEY_POINT（听悟带时间戳重点）；两种数据各自按原始 ordinal 排序。ordinal 默认0，offset 默认0且按该行的 Unicode 字符计数，limit 默认10、范围1～20。所有游标参数为整数，非负且有明确上限；不存在的未来 ordinal 且 offset=0 表示读完，而悬空、越界或恰好行尾的非零 offset 返回400 `INVALID_TRANSCRIPT`，类型无效也返回相同错误。
+
+返回 `fragmentId`、kind、`transcriptionAvailable`、items 和 `nextCursor`。尚未转写时 available=false、items 为空；已生成但无对应句子/重点或读取到末尾时 available=true、items 为空。nextCursor=null 表示本视图已结束；否则将其 ordinal 和 offset 原样传入下一次请求，并保留相同 kind。处理失败也允许读取已入库的原文。不存在或其他用户统一404 `FRAGMENT_NOT_FOUND`，附加 userId 不能改变查询所有权。
+
+每个 item 为一个最多1000个 Unicode 字符的文本窗口，包含原行 ordinal、当前 offset、是否 continuation、原始 sentenceId、startMs/endMs、text，以及句子的 speakerId。超过1000字的长句分多页完整读取，无重叠、无截断，补充 Unicode 字符不会被拆开；将同一 ordinal 的 text 按 offset 拼接即可还原全文。窗口沿用整句或重点的原始时间范围，不估算句内定位。speakerId 最多128字符，超过时 `speakerTruncated=true`，数据库原始标识不变；KEY_POINT 不产生说话人。
+
+数据库直接用 `SUBSTRING` 读取有界窗口，不把每个长句全文先加载到服务端内存；单页最多21次窗口读取，限制往返与响应大小。这些限制保护单次请求资源，不限制总页数或用户可读取的全文长度。每页在只读 REPEATABLE_READ 事务内保持一致视图；跨页删除会返回404，人工修改原文可能使旧 offset 失效，需重新读取。当前没有内容编辑 API。
+
+2026-10-06 分页模块5项真实 HTTP/MySQL 验证全部通过，包含4001个 emoji 的无损跨页拼回、序号间隙、空原文、长重点、时间与 sentenceId 保留、末尾和整数上界、输入边界及跨用户拒绝；同轮回归详情5项和状态3项，共13项通过，构建与打包成功。本轮复用已入库的数据夹具，没有新云调用。
