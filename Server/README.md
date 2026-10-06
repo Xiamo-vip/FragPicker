@@ -456,3 +456,13 @@ V9 增加 `chat_turns` 和 `chat_turn_sources`，保存当前问题、RUNNING/CO
 2026-10-06 模块验证共25项全部通过，包括4项真实 HTTP/MySQL SSE 契约、1项真实 DeepSeek/MySQL/本地 ONNX 两轮 HTTP 对话、9项编排、7项存储和4项读取回归。覆盖真实增量、提交后完成事件、同键重连无重复调用、失败重放、安静期间断线取消、鉴权与归属，以及来源卡片。设置 `CHAT_API_TEST_ENABLED=true` 并加载本机聊天环境变量，运行 `Server/scripts/Test-MySql.ps1` 可重跑这项付费验证。媒体检查点使用数据库夹具，本轮未重新上传 OSS 或验证 Android 播放。
 
 完整无密钥后端回归205项，190项通过、15项可选真实外部调用按开关跳过，构建与打包成功。
+
+## 本人会话列表 API
+
+`GET /api/v1/chat/sessions?limit=20&cursor=...` 需要 Bearer 登录，返回 `Cache-Control: no-store`。limit 默认20、范围1～50；cursor 首次省略，后续原样使用响应的 nextCursor。返回 items（sessionId、title、UTC createdAt/updatedAt）与 nextCursor；空列表/末页的 nextCursor 为 null。只读取登录用户的会话，不调用模型，也不返回幂等键、用户编号、问题正文或租约。
+
+按 updatedAt 降序、sessionId 降序做键集分页，查询最多 limit+1 条；已有用户/活动时间/编号组合索引支持排序。游标为最多96字符的规范 Base64URL，限定有效 UTC 毫秒时间和正64位编号；非法游标或页大小400 `INVALID_CHAT_PAGE`。游标仅用于筛选位置，不能改变登录归属，即使传入其他用户的游标或附加 userId。
+
+边界会话被删除时仍可继续分页，无需重新查询该记录。跨页不是固定快照：其他会话的新活动可能将记录移动到已读位置以上，这时需从第一页刷新；不会把分页结果宣称为变化期间的完整快照。发送、完成或失败一轮消息会更新会话活动时间。当前未提供会话改名、删除或详情 API。
+
+2026-10-06 会话列表4项真实 HTTP/MySQL 验证、创建5项与 SSE 契约4项共13项全部通过，构建与打包成功。包含63条同毫秒排序和跨页无重复、默认/最大页大小、Unicode 标题、UTC 时间、边界删除、活动变动、游标规范与整数上界、跨用户游标及注销后401。本轮未请求外部模型或云服务。
