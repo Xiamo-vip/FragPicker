@@ -33,6 +33,10 @@ management:
 
 fragpicker:
   business-zone: Asia/Shanghai
+  chat:
+    turn:
+      timeout: ${CHAT_TURN_TIMEOUT:180s}
+      max-concurrent: ${CHAT_MAX_CONCURRENT:2}
   knowledge:
     search:
       max-chunks: ${SEARCH_MAX_CHUNKS:100000}
