@@ -38,6 +38,10 @@ management:
 
 fragpicker:
   business-zone: Asia/Shanghai
+  digest:
+    generator:
+      max-output-tokens: ${DIGEST_MAX_OUTPUT_TOKENS:8192}
+      json-output: ${DIGEST_JSON_OUTPUT:true}
   chat:
     turn:
       timeout: ${CHAT_TURN_TIMEOUT:180s}
