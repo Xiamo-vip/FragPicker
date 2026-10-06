@@ -64,8 +64,20 @@ public class ChatTurnStore {
     public ChatTurnSnapshot get(long owner, long session, long id) {
         if (users.lockById(owner) == null) throw error(HttpStatus.NOT_FOUND, "CHAT_TURN_NOT_FOUND"); lockSession(owner, session); turns.expire(owner, session);
         var row = turns.get(owner, session, id); if (row == null) throw error(HttpStatus.NOT_FOUND, "CHAT_TURN_NOT_FOUND");
+        return snapshot(owner, row);
+    }
+    @Transactional
+    public ChatTurnPage list(long owner, long session, Long before, int limit) {
+        if (limit < 1 || limit > 20 || before != null && before < 1) throw error(HttpStatus.BAD_REQUEST, "INVALID_CHAT_PAGE");
+        if (users.lockById(owner) == null) throw error(HttpStatus.NOT_FOUND, "CHAT_SESSION_NOT_FOUND"); lockSession(owner, session); turns.expire(owner, session);
+        var rows = turns.page(owner, session, before, limit + 1);
+        var visible = rows.subList(0, Math.min(rows.size(), limit));
+        Long next = rows.size() > limit ? visible.getLast().id() : null;
+        return new ChatTurnPage(visible.stream().map(row -> snapshot(owner, row)).toList(), next);
+    }
+    private ChatTurnSnapshot snapshot(long owner, StoredChatTurn row) {
         var cards = new ArrayList<SearchResponse.Hit>();
-        try { for (var source : turns.snapshots(owner, id)) {
+        try { for (var source : turns.snapshots(owner, row.id())) {
             var card = json.readValue(source.snapshot(), SearchResponse.Hit.class); String path = "/api/v1/fragments/" + source.fragmentId() + "/media?kind=";
             if (card.fragmentId() != source.fragmentId() || card.match() == null || card.businessDate() == null
                     || card.videoMediaPath() != null && !card.videoMediaPath().equals(path + "VIDEO") || card.coverMediaPath() != null && !card.coverMediaPath().equals(path + "COVER")) throw error(HttpStatus.SERVICE_UNAVAILABLE, "CHAT_STORAGE_INVALID");

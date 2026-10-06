@@ -38,7 +38,7 @@ class DatabaseMigrationTest {
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
         assertThat(dataSource.getMaximumPoolSize()).isEqualTo(4);
         assertThat(dataSource.getMinimumIdle()).isZero();
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("9");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("10");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))
@@ -114,6 +114,14 @@ class DatabaseMigrationTest {
                 assertThat(Flyway.configure().dataSource(url, username, password).target("9").load().migrate().migrationsExecuted).isEqualTo(1);
                 try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement();
                      var row = statement.executeQuery("SELECT title FROM chat_sessions WHERE user_id = 1")) { assertThat(row.next()).isTrue(); assertThat(row.getString("title")).isEqualTo("升级后的数学对话"); }
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
+                    statement.execute("INSERT INTO chat_turns (session_id, user_id, idempotency_key, question, state, answer, lease_token, lease_expires_at, auth_version, created_at, completed_at, context_truncated, model_rounds, tool_calls) SELECT id, user_id, '00000000-0000-0000-0000-000000000002', '旧问题', 'COMPLETED', '旧答案', '00000000-0000-0000-0000-000000000003', UTC_TIMESTAMP(3) + INTERVAL 1 MINUTE, 0, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3), FALSE, 1, 0 FROM chat_sessions WHERE user_id = 1");
+                }
+                assertThat(Flyway.configure().dataSource(url, username, password).target("10").load().migrate().migrationsExecuted).isEqualTo(1);
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
+                    try (var row = statement.executeQuery("SELECT question, answer, state FROM chat_turns WHERE user_id = 1")) { assertThat(row.next()).isTrue(); assertThat(row.getString("question")).isEqualTo("旧问题"); assertThat(row.getString("answer")).isEqualTo("旧答案"); assertThat(row.getString("state")).isEqualTo("COMPLETED"); }
+                    try (var row = statement.executeQuery("SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns_list FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'chat_turns' AND index_name = 'idx_chat_turn_session_page'")) { assertThat(row.next()).isTrue(); assertThat(row.getString("columns_list")).isEqualTo("session_id,user_id,id"); }
+                }
             } finally { ddl.execute("DROP DATABASE " + schema); }
         }
     }

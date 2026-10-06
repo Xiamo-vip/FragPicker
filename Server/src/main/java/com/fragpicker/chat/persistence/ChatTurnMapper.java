@@ -22,6 +22,15 @@ public interface ChatTurnMapper {
     int insert(@Param("owner") long owner, @Param("session") long session, @Param("key") String key, @Param("question") String question, @Param("token") String token, @Param("seconds") long seconds, @Param("version") int version);
     @Select("SELECT * FROM chat_turns WHERE id = #{id} AND session_id = #{session} AND user_id = #{owner}")
     StoredChatTurn get(@Param("owner") long owner, @Param("session") long session, @Param("id") long id);
+    @Select("""
+            <script>
+            SELECT * FROM chat_turns WHERE session_id = #{session} AND user_id = #{owner}
+            <if test="before != null">AND id &lt; #{before}</if>
+            ORDER BY id DESC LIMIT #{count}
+            </script>
+            """)
+    List<StoredChatTurn> page(@Param("owner") long owner, @Param("session") long session,
+            @Param("before") Long before, @Param("count") int count);
     @Select("SELECT * FROM chat_turns WHERE id = #{id} AND session_id = #{session} AND user_id = #{owner} AND lease_token = #{token} AND state = 'RUNNING' AND lease_expires_at > UTC_TIMESTAMP(3) FOR UPDATE")
     StoredChatTurn valid(@Param("owner") long owner, @Param("session") long session, @Param("id") long id, @Param("token") String token);
     @Select("SELECT id FROM fragments WHERE id = #{id} AND user_id = #{owner} AND status = 'READY' FOR SHARE")
