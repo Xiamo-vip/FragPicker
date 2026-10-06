@@ -1,6 +1,28 @@
 # FragmentsPicker Server
 
-后端运行基线：Java 21+、Spring Boot 3.5、Maven Wrapper。Windows 使用 `mvnw.cmd`，Linux/macOS 使用 `./mvnw`。
+后端运行基线：Java 21、Spring Boot 3.5。支持 Maven Wrapper 和 Gradle Wrapper；Gradle 8.13 构建入口位于本目录的 `settings.gradle` 与 `build.gradle`。Gradle 从 `pom.xml` 读取直接依赖、版本和排除项，维护依赖时更新 POM；升级 Spring Boot 时同时更新 Gradle 插件版本，构建会检查两者一致。
+
+## IDEA 导入与 Gradle 构建
+
+后端 Gradle 项目目录是 `Server`。在 IDEA 的 Gradle 工具窗口选择 Link Gradle Project，关联 `Server/build.gradle`；Gradle Distribution 选 Wrapper，Gradle JVM 选 JDK 21。仓库根目录可同时关联 Android 与 Server 两个独立 Gradle 项目。已通过 Maven 导入后端时，先解除 `Server/pom.xml` 的 Maven 关联，再改用 Gradle，避免重复导入同一源码。
+
+若出现 `Directory '.../.tools/gradle-8.13/bin' does not contain a Gradle build`，解除该目录的错误项目关联，然后关联 `Server/build.gradle`。`.tools/gradle-8.13` 是本机 Gradle 安装目录，`bin` 存放执行程序；它们都不是后端项目目录。IDEA 配置位于本机忽略文件 `.idea/gradle.xml`，不提交个人 IDE 设置。修正后执行 Reload All Gradle Projects；如果 IDEA 仍使用打开期间缓存的关联，关闭项目后重新打开。
+
+```powershell
+cd Server
+# JAVA_HOME 指向本机 JDK 21，不在仓库中写死安装路径。
+.\gradlew.bat clean build
+.\gradlew.bat bootRun
+java -jar build/libs/fragpicker-server-0.1.0-SNAPSHOT.jar
+```
+
+Linux/macOS 使用 `./gradlew`。`build` 编译、执行 JUnit 测试并生成可执行 Spring Boot JAR。数据库和真实外部服务测试仍需要其对应环境变量；默认缺少配置时跳过，不能视为已验证真实集成。隔离 MySQL 脚本默认使用 Maven，传入 `-Gradle` 则使用后端 Gradle Wrapper。
+
+配置参考：[IDEA Gradle 导入](https://www.jetbrains.com/help/idea/gradle.html)、[Spring Boot 3.5 Gradle 插件](https://docs.spring.io/spring-boot/3.5/gradle-plugin/getting-started.html)。
+
+## Maven 构建
+
+Windows 使用 `mvnw.cmd`，Linux/macOS 使用 `./mvnw`。
 
 ```powershell
 cd Server
@@ -45,9 +67,11 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 
 ```powershell
 .\scripts\Test-MySql.ps1
+# 验证 Gradle 构建时使用：
+.\scripts\Test-MySql.ps1 -Gradle
 ```
 
-脚本使用已安装的 MySQL 可执行文件，在项目忽略目录 `.tools` 创建新的数据目录并绑定随机本机端口，使用随机测试密码，然后运行 `verify` 并关闭实例。它不访问现有 MySQL 的数据目录，不修改现有服务，不使用已有账号密码。日志与测试数据保留在 `.tools/mysql-test-*`，便于失败诊断。
+脚本使用已安装的 MySQL 可执行文件，在项目忽略目录 `.tools` 创建新的数据目录并绑定随机本机端口，使用随机测试密码，然后运行 Maven `verify` 或 Gradle `clean build` 并关闭实例。它不访问现有 MySQL 的数据目录，不修改现有服务，不使用已有账号密码。日志与测试数据保留在 `.tools/mysql-test-*`，便于失败诊断。
 
 普通 `mvnw verify` 运行无数据库启动测试；没有 `DB_TEST_URL` 时明确跳过数据库集成测试。交付前使用上面的脚本在真实 MySQL 上完成验证。后续业务表随各模块通过新增迁移脚本演进，不修改已交付迁移。
 

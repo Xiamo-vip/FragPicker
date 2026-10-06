@@ -1,4 +1,4 @@
-param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0)
+param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0, [switch]$Gradle)
 
 $ErrorActionPreference = 'Stop'
 if (-not $MySqlBin) {
@@ -50,7 +50,11 @@ try {
     $env:DB_TEST_PASSWORD = $testPassword
     $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     Write-Output "Running integration tests on isolated MySQL at localhost:$port. Existing MySQL service is untouched."
-    & (Join-Path $serverRoot 'mvnw.cmd') '-B' '-ntp' '-f' (Join-Path $serverRoot 'pom.xml') 'verify'
+    if ($Gradle) {
+        & (Join-Path $serverRoot 'gradlew.bat') '-p' $serverRoot 'clean' 'build' '--no-daemon' '--console=plain'
+    } else {
+        & (Join-Path $serverRoot 'mvnw.cmd') '-B' '-ntp' '-f' (Join-Path $serverRoot 'pom.xml') 'verify'
+    }
     if ($LASTEXITCODE -ne 0) { throw 'MySQL integration verification failed' }
     if ($AndroidAuth) {
         $httpListener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $HttpPort)
@@ -63,7 +67,8 @@ try {
         $env:DB_PASSWORD = $env:DB_TEST_PASSWORD
         $env:SERVER_PORT = "$HttpPort"
         $env:AI_CHAT_ENABLED = 'false'
-        $jar = Join-Path $serverRoot 'target/fragpicker-server-0.1.0-SNAPSHOT.jar'
+        $jarDirectory = if ($Gradle) { 'build/libs' } else { 'target' }
+        $jar = Join-Path $serverRoot "$jarDirectory/fragpicker-server-0.1.0-SNAPSHOT.jar"
         $javaExe = Join-Path $env:JAVA_HOME 'bin/java.exe'
         $apiProcess = Start-Process -FilePath $javaExe -ArgumentList '-jar', "`"$jar`"",
             '--spring.profiles.active=database', '--server.address=127.0.0.1' -WindowStyle Hidden -PassThru `

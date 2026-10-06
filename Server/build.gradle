@@ -1,0 +1,68 @@
+import groovy.xml.XmlSlurper
+import org.springframework.boot.gradle.plugin.SpringBootPlugin
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.16'
+}
+
+// Keep Maven and Gradle on the same direct dependencies, versions and exclusions.
+// This project's POM has direct dependencies and simple ${property} versions only.
+def pom = new XmlSlurper().parse(file('pom.xml'))
+group = pom.groupId.text()
+version = pom.version.text()
+description = pom.description.text()
+
+if (SpringBootPlugin.BOM_COORDINATES != "org.springframework.boot:spring-boot-dependencies:${pom.parent.version.text()}") {
+    throw new GradleException('Update the Spring Boot Gradle plugin version to match pom.xml.')
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    implementation platform(SpringBootPlugin.BOM_COORDINATES)
+    pom.dependencies.dependency.each { dependency ->
+        def scope = dependency.scope.text() ?: 'compile'
+        def configuration = [compile: 'implementation', runtime: 'runtimeOnly', test: 'testImplementation'][scope]
+        if (configuration == null) {
+            throw new GradleException("Unsupported Maven dependency scope: ${scope}")
+        }
+        def dependencyVersion = dependency.version.text().replaceAll(/\$\{([^}]+)\}/) { match, property ->
+            def value = pom.properties[property].text()
+            if (!value) {
+                throw new GradleException("Unknown Maven version property: ${property}")
+            }
+            value
+        }
+        def coordinate = "${dependency.groupId.text()}:${dependency.artifactId.text()}"
+        if (dependencyVersion) {
+            coordinate += ":${dependencyVersion}"
+        }
+        add(configuration, coordinate) {
+            dependency.exclusions.exclusion.each { exclusion ->
+                exclude group: exclusion.groupId.text(), module: exclusion.artifactId.text()
+            }
+        }
+    }
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+    // Spring MVC and method security need retained Java parameter names.
+    options.compilerArgs.add('-parameters')
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    maxHeapSize = '1g'
+}
+
+tasks.named('jar') {
+    enabled = false
+}
