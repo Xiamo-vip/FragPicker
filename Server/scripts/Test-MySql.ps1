@@ -18,7 +18,7 @@ $listener.Start()
 $port = $listener.LocalEndpoint.Port
 $listener.Stop()
 $savedEnvironment = @{}
-foreach ($name in @('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD')) {
+foreach ($name in @('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD','JWT_SIGNING_KEY')) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 $testProcess = $null
@@ -46,6 +46,7 @@ try {
     $env:DB_TEST_URL = "jdbc:mysql://127.0.0.1:$port/fragpicker_test?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&sslMode=DISABLED"
     $env:DB_TEST_USERNAME = 'root'
     $env:DB_TEST_PASSWORD = $testPassword
+    $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     Write-Output "Running integration tests on isolated MySQL at localhost:$port. Existing MySQL service is untouched."
     & (Join-Path $serverRoot 'mvnw.cmd') '-B' '-ntp' '-f' (Join-Path $serverRoot 'pom.xml') 'verify'
     if ($LASTEXITCODE -ne 0) { throw 'MySQL integration verification failed' }

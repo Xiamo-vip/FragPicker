@@ -18,3 +18,8 @@ mybatis-plus:
     map-underscore-to-camel-case: true
   global-config:
     banner: false
+
+fragpicker:
+  auth:
+    signing-key: ${JWT_SIGNING_KEY}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}

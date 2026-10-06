@@ -34,6 +34,8 @@ mysql -u root -p --execute="source scripts/init-local-mysql.sql"
 $env:DB_URL = 'jdbc:mysql://localhost:3306/fragpicker?connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true'
 $env:DB_USERNAME = 'fragpicker'
 # DB_PASSWORD 通过本机环境或安全输入配置，不提交到文件。
+$env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+# 同一个部署需保持该签名密钥稳定；生产环境用秘密存储注入。
 .\mvnw.cmd spring-boot:run '-Dspring-boot.run.profiles=database'
 ```
 
@@ -55,13 +57,24 @@ $env:DB_USERNAME = 'fragpicker'
 
 成功返回 HTTP 201 和 `id`、`username`、`businessZone`。重复用户名返回 409 / `USERNAME_TAKEN`，非法输入返回 400。数据库只保存 BCrypt 盐化哈希，响应不包含密码或哈希。
 
-## 环境变量约定
+## 登录与鉴权
+
+`POST /api/v1/auth/login` 接收用户名和密码，成功返回 `accessToken`、`tokenType: Bearer`、`expiresIn`（秒）和用户资料。访问令牌默认有效15分钟；受保护请求通过 `Authorization: Bearer <token>` 携带令牌。
+
+签名采用 HS256，`JWT_SIGNING_KEY` 必须是至少32随机字节的 Base64 编码值，没有默认密钥。鉴权检查签名、过期时间、发行方、受众、账号状态和数据库中的令牌版本。错误密码和不存在账号统一返回 401 / `INVALID_CREDENTIALS`。
+
+`bootstrap` 仅用于健康检查，不加载业务接口。实际 `database` profile 的业务接口默认需要鉴权，仅注册、登录和健康检查公开。
+
+## 环境变量配置
 
 `application.yml` 中的凭据只引用环境变量。测试 AppKey、Bucket 和 AccessKey 同样通过环境变量配置，不提交真实值。
 
 | 环境变量 | 用途 |
 | --- | --- |
 | SERVER_PORT | HTTP 端口，默认 8080 |
+| DB_URL / DB_USERNAME / DB_PASSWORD | 本机 MySQL 连接与账号 |
+| JWT_SIGNING_KEY | 至少32字节随机密钥的 Base64 值 |
+| JWT_ACCESS_TOKEN_TTL | 访问令牌时长，默认15分钟 |
 | PARSEVIDEO_BASE_URL | 已部署的视频解析服务地址 |
 | TINGWU_APP_KEY | 听悟应用 AppKey |
 | OSS_BUCKET / OSS_ENDPOINT | 私有对象存储 Bucket 与 Endpoint |
