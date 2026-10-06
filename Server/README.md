@@ -392,7 +392,7 @@ V7 创建 `fragment_indexes` 和 `fragment_index_chunks`，记录用户、模型
 
 完整后端回归179项，166项通过、13项外部真实调用按开关跳过，构建与打包成功。随着独立测试上下文增加，默认连接池累计触及测试 MySQL 的连接上限；首轮测试配置的 minimum-idle=0 使回归通过，但随后直接检查 DataSource 发现最大连接数仍被 database profile 覆盖为10。测试限制已移到 `src/test/resources/application-database.properties`，并增加实际连接池参数检查，确保最大4个连接、无空闲连接预留；生产连接池配置保持原值。
 
-连接池修复的独立验证共18项全部通过，包括真实 DataSource 参数、MySQL 升级、并发会话和流式编排边界。扩大回归时另发现可选真实流式测试提前初始化模型的问题，将单独修复开关边界后重跑完整回归。
+连接池修复的独立验证共18项全部通过，包括真实 DataSource 参数、MySQL 升级、并发会话和流式编排边界。扩大回归时另发现可选真实流式测试提前初始化模型的问题；其开关已单独提升到测试类级别，禁用时整个 Spring 测试上下文不会加载模型。清除 AI 密钥与模型配置后完整回归189项，175项通过、14项外部真实调用按开关跳过，构建与打包成功。
 
 ## 流式对话与历史工具编排
 
@@ -405,3 +405,5 @@ V7 创建 `fragment_indexes` 和 `fragment_index_chunks`，记录用户、模型
 取消优先使用 [LangChain4j 官方流式取消机制](https://docs.langchain4j.dev/tutorials/response-streaming/#streaming-cancellation)，捕获句子、推理或工具回调中的 StreamingHandle 并关闭传输；首次回调前尚未取得句柄时，迟到回调会立即取消并被忽略。释放本轮容量不能证明云端已停止计费，云调用也受已有 SDK 超时限制。模型正在生成的草稿不能作为成功入库回答；持久化状态、断线恢复和 SSE 投递由后续模块接入。
 
 2026-10-06 编排单元9项、真实 DeepSeek/MySQL/ONNX 两轮对话1项、创建会话5项和聊天供应商契约6项，共21项全部通过，构建与打包成功。真实验证检查前一轮问答进入第二轮、本人检索工具调用、来源归属、真实增量与最终正文一致，以及封面/视频授权路径；媒体检查点使用本轮数据库夹具，没有新增 OSS 上传或 Android 播放验证。设置 `CHAT_TURN_TEST_ENABLED=true` 并加载本机聊天环境变量后运行 `Server/scripts/Test-MySql.ps1` 可重跑这项付费验证。
+
+真实测试开关提升到类级别后，开启开关的真实 DeepSeek 两轮流式测试也单独重跑通过；禁用开关的无密钥完整回归见前节记录。

@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("database")
 @EnabledIfEnvironmentVariable(named = "DB_TEST_URL", matches = ".+")
+@EnabledIfEnvironmentVariable(named = "CHAT_TURN_TEST_ENABLED", matches = "true")
 class ChatTurnIntegrationTest {
     private static final String SCHEMA = "fragpicker_turn_" + UUID.randomUUID().toString().replace("-", "");
     @Autowired ChatTurnEngine engine;
@@ -43,7 +44,7 @@ class ChatTurnIntegrationTest {
         try (var connection = java.sql.DriverManager.getConnection(System.getenv("DB_TEST_URL"), System.getenv("DB_TEST_USERNAME"), System.getenv("DB_TEST_PASSWORD")); var statement = connection.createStatement()) { statement.execute("DROP DATABASE IF EXISTS " + SCHEMA); }
     }
     @AfterEach void clean() { for (long id : owned) jdbc.update("DELETE FROM users WHERE id = ?", id); }
-    @Test @EnabledIfEnvironmentVariable(named = "CHAT_TURN_TEST_ENABLED", matches = "true")
+    @Test
     void realDeepSeekStreamsTwoContextualTurnsThroughOwnedToolAndVerifiedCards() {
         long owner = owner(), foreign = owner(); var math = pending(owner, "导数与瞬时变化率课程", "数学学习：导数是函数瞬时变化率，用极限和切线斜率理解导数，并用求导公式判断函数单调性。");
         pending(foreign, "别人的秘密课程", "导数数学与瞬时变化率课程。"); var worker = new IndexWorker(indexes, embeddings); assertThat(worker.runOnce()).isTrue(); assertThat(worker.runOnce()).isTrue();
