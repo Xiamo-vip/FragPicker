@@ -24,6 +24,9 @@ class AuthApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
     suspend fun login(username: String, password: String): LoginSession = session(request("POST", "/api/v1/auth/login",
         JSONObject().put("username", username).put("password", password)))
 
+    suspend fun register(username: String, password: String): UserProfile = user(request("POST", "/api/v1/auth/register",
+        JSONObject().put("username", username).put("password", password)))
+
     suspend fun refresh(refreshToken: String): LoginSession = session(request("POST", "/api/v1/auth/refresh",
         JSONObject().put("refreshToken", refreshToken)))
 

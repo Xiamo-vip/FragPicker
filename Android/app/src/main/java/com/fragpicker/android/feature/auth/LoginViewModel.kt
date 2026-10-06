@@ -17,6 +17,10 @@ class LoginViewModel(private val repository: AuthRepository) : ViewModel() {
     private val mutableState = MutableStateFlow(LoginUiState())
     val state = mutableState.asStateFlow()
 
+    fun clearError() {
+        if (!state.value.loading) mutableState.value = state.value.copy(error = null)
+    }
+
     init {
         viewModelScope.launch {
             try { mutableState.value = LoginUiState(loading = false, user = repository.restore()) }

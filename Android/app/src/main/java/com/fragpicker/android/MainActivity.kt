@@ -5,11 +5,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -25,8 +29,12 @@ class MainActivity : ComponentActivity() {
     private val theme: ThemeViewModel by viewModels {
         viewModelFactory { initializer { ThemeViewModel(ThemeRepository(applicationContext)) } }
     }
+    private val authRepository by lazy { AuthRepository(AuthApi(), SessionVault(applicationContext)) }
     private val login: LoginViewModel by viewModels {
-        viewModelFactory { initializer { LoginViewModel(AuthRepository(AuthApi(), SessionVault(applicationContext))) } }
+        viewModelFactory { initializer { LoginViewModel(authRepository) } }
+    }
+    private val registration: RegistrationViewModel by viewModels {
+        viewModelFactory { initializer { RegistrationViewModel(authRepository) } }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,6 +43,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             val mode by theme.mode.collectAsStateWithLifecycle()
             val account by login.state.collectAsStateWithLifecycle()
+            val registrationState by registration.state.collectAsStateWithLifecycle()
+            var showRegistration by rememberSaveable { mutableStateOf(false) }
+            var registeredUsername by rememberSaveable { mutableStateOf("") }
+            BackHandler(enabled = showRegistration) { showRegistration = false }
             FragmentsPickerTheme(mode) {
                 Scaffold { padding ->
                     Column(
@@ -45,7 +57,16 @@ class MainActivity : ComponentActivity() {
                         Text("FragmentsPicker", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         val user = account.user
                         if (user == null) {
-                            LoginScreen(account, login::login)
+                            if (showRegistration) {
+                                RegistrationScreen(registrationState, registration::register,
+                                    onBack = { showRegistration = false }, onCreated = {
+                                        registeredUsername = it; login.clearError(); showRegistration = false
+                                    })
+                            } else {
+                                LoginScreen(account, login::login, onRegister = {
+                                    registration.reset(); showRegistration = true
+                                }, initialUsername = registeredUsername)
+                            }
                         } else {
                             Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer) {
                                 Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {

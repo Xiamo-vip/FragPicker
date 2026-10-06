@@ -24,8 +24,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun LoginScreen(state: LoginUiState, onLogin: (String, String) -> Unit) {
-    var username by rememberSaveable { mutableStateOf("") }
+fun LoginScreen(state: LoginUiState, onLogin: (String, String) -> Unit, onRegister: () -> Unit, initialUsername: String = "") {
+    var username by rememberSaveable(initialUsername) { mutableStateOf(initialUsername) }
     var password by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -42,6 +42,7 @@ fun LoginScreen(state: LoginUiState, onLogin: (String, String) -> Unit) {
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        if (initialUsername.isNotEmpty()) Text("账号已创建，请登录。", color = MaterialTheme.colorScheme.primary)
         OutlinedTextField(username, onValueChange = { if (it.length <= 32) username = it },
             label = { Text("用户名") }, singleLine = true, enabled = !state.loading,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
@@ -66,6 +67,9 @@ fun LoginScreen(state: LoginUiState, onLogin: (String, String) -> Unit) {
                 Spacer(Modifier.width(12.dp))
                 Text("正在连接…")
             } else Text("登录")
+        }
+        TextButton(onClick = onRegister, enabled = !state.loading, modifier = Modifier.fillMaxWidth()) {
+            Text("创建账号")
         }
     }
 }

@@ -19,6 +19,10 @@ class AuthRepository(private val api: AuthApi, private val vault: SessionVault) 
         activate(api.login(username, password))
     }
 
+    suspend fun register(username: String, password: String): UserProfile = mutex.withLock {
+        api.register(username, password)
+    }
+
     private suspend fun activate(session: LoginSession): UserProfile {
         val user = api.currentUser(session.accessToken)
         check(user.id == session.user.id) { "Session user mismatch" }
