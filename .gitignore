@@ -1,0 +1,26 @@
+# Credentials and machine-specific configuration
+.env
+.env.*
+!.env.example
+**/application-local.yml
+**/application-local.yaml
+**/local.properties
+*.jks
+*.keystore
+*.pem
+
+# Build and runtime output
+.tools/
+**/target/
+**/build/
+**/.gradle/
+**/.kotlin/
+logs/
+*.log
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

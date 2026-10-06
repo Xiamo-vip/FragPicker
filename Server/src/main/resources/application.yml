@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: fragpicker-server
+  jackson:
+    time-zone: UTC
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+
+fragpicker:
+  business-zone: Asia/Shanghai
+  integrations:
+    parsevideo:
+      base-url: ${PARSEVIDEO_BASE_URL:}
+    tingwu:
+      app-key: ${TINGWU_APP_KEY:}
+    oss:
+      bucket: ${OSS_BUCKET:}
+      endpoint: ${OSS_ENDPOINT:}
+    aliyun:
+      access-key-id: ${ALIBABA_CLOUD_ACCESS_KEY_ID:}
+      access-key-secret: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET:}
+    ai:
+      api-key: ${AI_API_KEY:}
+      chat-model: ${AI_CHAT_MODEL:}
+      embedding-model: ${AI_EMBEDDING_MODEL:}
