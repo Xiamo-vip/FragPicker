@@ -349,3 +349,15 @@ V7 创建 `fragment_indexes` 和 `fragment_index_chunks`，记录用户、模型
 运行 `Server/scripts/Test-MySql.ps1` 验证真实 HTTP 注册登录→MySQL→ONNX→搜索卡片，包含“变化率→导数”、跨用户隔离、日期/分类/作者/字面筛选、跨分段关键词、271段键集分页、视频去重、模型版本/状态隔离、并发限制、输入边界及损坏向量。媒体卡片的本轮夹具不上传云文件；真实私有 OSS 签名与 Range 验证见媒体接口章节。分类 SQL 的语义参考 [MySQL JSON 搜索函数](https://dev.mysql.com/doc/refman/8.0/en/json-search-functions.html)。
 
 2026-10-06 搜索模块12项验证全部通过，含真实 HTTP、隔离 MySQL 与本地 ONNX 的中文语义召回。完整后端兼容性检查共157项，145项通过、12项真实外部调用按开关跳过，构建与打包成功；本轮没有重新请求聊天或听悟云服务。
+
+## 本人内容详情 API
+
+`GET /api/v1/fragments/{id}/content`，需要 Bearer 登录，返回 `Cache-Control: no-store`。包含投喂链接与备注、来源平台、业务日期/时区、UTC 创建时间、当前处理阶段和稳定错误码，以及标题、作者、受保护的媒体 API 路径、原文句数和带时间戳重点数。未解析时标题为“投喂记录”；媒体检查点尚不存在时相应路径为 null。
+
+`knowledge` 在尚未转写时为 null；已完成转写的记录无论是否增强/索引成功，都能读取已保留资料。它包含毫秒时长、`originalSummaryPreview`、增强 `summary`、增强 `points`、听悟 `keywords`、主题 `categories` 和 UTC 完成/增强时间。增强尚未产生时，summary/enrichedAt 为 null，points/categories 为空；不根据原文虚构摘要或把失败伪装为完成。所有内容查询都带登录用户，附加 userId 无效；不存在与其他用户统一404 `FRAGMENT_NOT_FOUND`，无登录401。
+
+为了让详情首屏响应有界，标题最多500个 Unicode 字符、作者100、原始摘要预览4000、增强摘要2000、增强要点最多8条/每条300、关键词最多100条/每条100。分别返回 `titleTruncated`、`authorTruncated`、`originalSummaryTruncated`、`summaryTruncated`、`pointsTruncated`、`keywordsTruncated`；数据库原始值保持完整。正常增强结果已满足这些展示边界。完整转写与带时间戳重点将在分页接口读取，不在详情首屏一次性加载。客户端应显示预览提示，而不能将标记为截断的字段宣称为全文。
+
+详情和知识读取在只读 REPEATABLE_READ 事务中完成，保持此次响应的处理阶段与资料视图一致；没有模型或云资源调用。数据库 JSON 类型/分类异常返回503 `CONTENT_INVALID`，不回显原始内容或异常正文。API 不返回平台临时资源地址、OSS 对象键、云 TaskId、向量或租约信息。
+
+2026-10-06 详情模块5项真实 HTTP/MySQL 验证全部通过，覆盖已完成与处理中/失败资料、预览边界、补充 Unicode 字符、原文保留、所有权及异常分类；同轮回归状态接口3项和真实语义搜索6项，共14项通过，构建与打包成功。媒体路径测试使用数据库夹具；私有 OSS 与上游转写真实验证见前文各模块记录。
