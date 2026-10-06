@@ -16,6 +16,7 @@ server:
 logging:
   level:
     com.aliyun.oss: 'OFF'
+    org.apache.http: 'OFF'
 
 management:
   endpoints:
@@ -39,6 +40,14 @@ fragpicker:
       retry-base-delay: ${INGESTION_RETRY_BASE_DELAY:10s}
     allowed-hosts: ${INGESTION_ALLOWED_HOSTS:www.acfun.cn,tv.cctv.cn,tv.cctv.com,doupai.cc,v.douyin.com,www.iesdouyin.com,www.douyin.com,haokan.baidu.com,haokan.hao123.com,www.bilibili.com,b23.tv,m.bilibili.com,v.huya.com,v.kuaishou.com,www.pearvideo.com,weibo.cn,meipai.com,h5.pipigx.com,h5.pipix.com,xspshare.baidu.com,kg.qq.com,6.cn,tv.sohu.com,my.tv.sohu.com,weibo.com,isee.weishi.qq.com,v.ixigua.com,www.ixigua.com,xinpianchang.com,share.xiaochuankeji.cn,www.xiaohongshu.com,xhslink.com,xhslink.cn,twitter.com,x.com,t.co,mobile.twitter.com,v.qq.com,m.v.qq.com}
   integrations:
+    media:
+      temp-directory: ${MEDIA_TEMP_DIR:${java.io.tmpdir}/fragpicker-media}
+      max-video-bytes: ${MEDIA_MAX_VIDEO_BYTES:1073741824}
+      max-cover-bytes: ${MEDIA_MAX_COVER_BYTES:10485760}
+      connect-timeout: ${MEDIA_CONNECT_TIMEOUT:5s}
+      read-timeout: ${MEDIA_READ_TIMEOUT:30s}
+      total-timeout: ${MEDIA_TOTAL_TIMEOUT:5m}
+      max-redirects: ${MEDIA_MAX_REDIRECTS:3}
     parsevideo:
       enabled: ${PARSEVIDEO_ENABLED:false}
       base-url: ${PARSEVIDEO_BASE_URL:}

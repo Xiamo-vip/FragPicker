@@ -98,6 +98,10 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | PARSEVIDEO_CONNECT_TIMEOUT / PARSEVIDEO_READ_TIMEOUT | 连接与读取超时，默认5秒 / 45秒 |
 | PARSEVIDEO_MAX_RESPONSE_BYTES | 解析响应上限，默认1 MiB |
 | PARSEVIDEO_USERNAME / PARSEVIDEO_PASSWORD | 可选 Basic Auth 凭据，必须成对配置 |
+| MEDIA_TEMP_DIR | 媒体暂存目录，默认系统临时目录下 fragpicker-media |
+| MEDIA_MAX_VIDEO_BYTES / MEDIA_MAX_COVER_BYTES | 下载大小上限，默认1 GiB / 10 MiB |
+| MEDIA_CONNECT_TIMEOUT / MEDIA_READ_TIMEOUT / MEDIA_TOTAL_TIMEOUT | 连接、读取空闲、HTTP 总时限，默认5秒 / 30秒 / 5分钟 |
+| MEDIA_MAX_REDIRECTS | 手动检查的重定向上限，默认3，允许0～5 |
 | TINGWU_APP_KEY | 听悟应用 AppKey |
 | OSS_BUCKET / OSS_ENDPOINT | 私有对象存储 Bucket 与 Endpoint |
 | OSS_ENABLED | 启用 OSS 适配器，默认 false，启动时验证私有 Bucket |
@@ -183,3 +187,15 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 所需权限至少包含 Bucket ACL 查询以及目标对象前缀的 PutObject、GetObject、DeleteObject（删除用于测试清理/将来用户删除）；真实验证不得用模拟替代。此模块尚未从 parsevideo 下载视频、推进媒体任务或提供鉴权播放 API，相关业务按后续独立模块接入。
 
 2026-10-06 开发验证已使用用户配置的深圳测试 Bucket 完成真实上传、重复上传、签名下载、匿名403、过期403与本次对象清理；凭据仅注入测试进程环境，没有写入源码或仓库。真实上传验证使用极小 PNG，不代表大视频、网络目标校验或整条转写链路已完成。
+
+## 媒体下载适配器
+
+`SafeMediaDownloader` 将解析后的资源流式写入独立暂存文件，调用方通过 try-with-resources 关闭 `DownloadedMedia` 时删除文件。失败会中止 HTTP 请求并删除已创建文件；不会为释放连接继续读取超大响应。此模块仅下载，不自动领取 `MEDIA_PENDING` 任务或上传 OSS，后续媒体工作线程将连接这些适配器。
+
+仅接受标准端口的 HTTP(S) URL，拒绝凭据、片段及本机域名。HTTP socket 实际使用经 `PublicNetworkPolicy` 验证的 DNS 地址，混合公网/私网结果整体拒绝；IPv4 私网、loopback、链路本地、共享/保留/文档/多播地址与 IPv6 本地、文档及过渡地址均被拦截。每次重定向重新校验，禁止 HTTPS 降到 HTTP。系统代理、自动重试、自动重定向、cookie 和自动解压均不启用，避免绕过连接目标与大小校验。部署时仍应限制后端出站网络。
+
+同时检查 Content-Length 与实际读取大小；总 HTTP 时限通过独立定时器中止当前请求，也适用于持续少量输出的响应。DNS 查询本身受系统解析时限影响。默认资源上限是工程边界，可以用环境变量调整，允许视频最多5 GiB、封面最多50 MiB。只发送原平台 origin 作为 Referer，不携带分享链接的查询参数、用户备注或认证凭据。原始 HTTP 日志关闭，失败只保留稳定错误码。
+
+根据文件头识别 MP4/QuickTime、Matroska/WebM、FLV，以及 PNG、JPEG、WebP、GIF，不信任响应声明的 MIME。格式识别不是完整解码验证；时长、轨道与可转写性仍需后续处理。HTML、图集、HLS/M3U8 与不识别的格式返回 `UNSUPPORTED_CONTENT`，不会保存为可播放成功记录。HTTP401/403 标记来源失效，后续媒体任务应重新解析分享链接获取资源，而非无限重试旧地址。
+
+设置 `MEDIA_TEST_PARSEVIDEO_BASE_URL` 后运行媒体真实测试，会调用解析服务的公开 B 站样本，下载实际封面和视频，校验文件类型并删除本次文件；未设置时明确跳过。2026-10-06 已用原生产连接校验下载651,508字节封面与51,973,319字节视频，12项本模块及启动验证通过。本机代理 Fake-IP DNS 曾返回198.18.x.x，被正确拦截；最终验证仅对测试 JVM 通过 `jdk.net.hosts.file` 注入阿里公共 DNS 的当时公网结果，未修改系统 DNS、未放开保留地址段。这些临时映射位于忽略目录，不能作为长期部署配置。
