@@ -1,6 +1,8 @@
 spring:
   application:
     name: fragpicker-server
+  profiles:
+    default: bootstrap
   jackson:
     time-zone: UTC
 
