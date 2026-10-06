@@ -112,3 +112,13 @@ parsevideo、听悟和 OSS 目前仍为配置占位符。设置环境变量后�
 [DeepSeek 接口文档](https://api-docs.deepseek.com/zh-cn/)提供当前模型名称；模型名通过环境配置，不在代码中固定。embedding 使用 LangChain4j 本地模型的独立模块，不使用聊天 API Key。
 
 本次模型适配器通过本机 HTTP 契约测试覆盖普通回复、工具参数和推理字段保留、流式结束与错误、超时及无自动重试；这些测试不代表已完成真实 DeepSeek 验证。尚未提供对话业务接口、历史检索 Tools 或消息持久化，它们按后续独立模块交付。
+
+## 本地中文 embedding
+
+使用 LangChain4j 提供的量化 `BgeSmallZhV15QuantizedEmbeddingModel`（512维）。ONNX 模型与 tokenizer 随 Maven 依赖进入可执行 JAR；首次构建需要下载依赖，运行时无需请求百炼、Hugging Face 或其他云模型，不需要 embedding API Key。Bean 延迟初始化，基础启动检查不加载模型。
+
+`LocalEmbeddingService` 区分查询和文档：查询加中文检索指令，文档保持原文；返回有限、归一化向量。模型标识为 `bge-small-zh-v1.5-q@langchain4j-1.21.0-beta31`，后续索引须一并记录此标识和维度，切换模型后重建索引。
+
+为控制推理负载，文档片段限384 Unicode 码点，查询限256码点，批次限16条，推理串行执行；这些是应用输入边界，不等同于 tokenizer 的 token 数。长转写必须由后续索引模块分片，不能静默截断。此模块提供真实本地模型推理与中文检索样例测试，数据库索引、用户数据筛选和检索接口仍在后续模块实现。
+
+模型依据：[LangChain4j 本地 ONNX 模型](https://docs.langchain4j.dev/integrations/embedding-models/in-process/)、[BGE 中文模型说明](https://huggingface.co/BAAI/bge-small-zh-v1.5)。中文样例用于验证基础召回顺序，不代表所有资料都达到固定准确率。
