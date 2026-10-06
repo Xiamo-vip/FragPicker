@@ -14,7 +14,7 @@ import java.net.HttpURLConnection;
 @ConditionalOnProperty(prefix = "fragpicker.integrations.parsevideo", name = "enabled", havingValue = "true")
 public class ParseVideoConfiguration {
     @Bean
-    ParseVideoClient parseVideoClient(ParseVideoProperties properties, ObjectMapper json) {
+    public ParseVideoClient parseVideoClient(ParseVideoProperties properties, ObjectMapper json) {
         properties.validateEnabled();
         var factory = new SimpleClientHttpRequestFactory() {
             @Override

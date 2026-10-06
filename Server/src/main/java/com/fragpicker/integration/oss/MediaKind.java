@@ -10,5 +10,5 @@ public enum MediaKind {
     private final Set<String> contentTypes;
     MediaKind(String segment, Set<String> contentTypes) { this.segment = segment; this.contentTypes = contentTypes; }
     public String segment() { return segment; }
-    boolean allows(String contentType) { return contentTypes.contains(contentType); }
+    public boolean allows(String contentType) { return contentTypes.contains(contentType); }
 }

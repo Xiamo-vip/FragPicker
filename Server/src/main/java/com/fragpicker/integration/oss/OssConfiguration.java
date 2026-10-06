@@ -13,7 +13,7 @@ import java.time.Clock;
 @ConditionalOnProperty(prefix = "fragpicker.integrations.oss", name = "enabled", havingValue = "true")
 public class OssConfiguration {
     @Bean(destroyMethod = "shutdown")
-    OSS ossClient(OssProperties properties, AliyunCredentialsProperties credentials) {
+    public OSS ossClient(OssProperties properties, AliyunCredentialsProperties credentials) {
         properties.validate(); credentials.validate();
         var conf = new ClientBuilderConfiguration();
         conf.setSignatureVersion(SignVersion.V4);

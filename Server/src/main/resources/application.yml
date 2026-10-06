@@ -32,6 +32,12 @@ management:
 fragpicker:
   business-zone: Asia/Shanghai
   ingestion:
+    media-worker:
+      enabled: ${MEDIA_WORKER_ENABLED:false}
+      poll-delay: ${MEDIA_WORKER_POLL_DELAY:2s}
+      lease-duration: ${MEDIA_WORKER_LEASE_DURATION:30m}
+      max-attempts: ${MEDIA_WORKER_MAX_ATTEMPTS:3}
+      retry-base-delay: ${MEDIA_WORKER_RETRY_BASE_DELAY:10s}
     worker:
       enabled: ${INGESTION_WORKER_ENABLED:false}
       poll-delay: ${INGESTION_POLL_DELAY:2s}

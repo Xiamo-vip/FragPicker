@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class MediaDownloadConfiguration {
     @Bean(destroyMethod = "close")
-    SafeMediaDownloader safeMediaDownloader(MediaDownloadProperties properties) {
+    public SafeMediaDownloader safeMediaDownloader(MediaDownloadProperties properties) {
         properties.validate();
         var requestConfig = RequestConfig.custom().setConnectTimeout((int) properties.connectTimeout().toMillis())
                 .setConnectionRequestTimeout((int) properties.connectTimeout().toMillis())

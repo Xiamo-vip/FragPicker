@@ -115,6 +115,9 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | AI_CHAT_MODEL | 聊天模型名，启用时必填，无默认模型 |
 | AI_CHAT_TIMEOUT | 调用超时，默认60秒，允许1秒～5分钟 |
 | AI_CHAT_MAX_OUTPUT_TOKENS | 最大输出 token 数，默认4096，允许1～32768 |
+| MEDIA_WORKER_ENABLED | 启用后台媒体保存任务，默认 false；要求 parsevideo 与 OSS 同时启用 |
+| MEDIA_WORKER_POLL_DELAY / MEDIA_WORKER_LEASE_DURATION | 轮询间隔与租约，默认2秒 / 30分钟 |
+| MEDIA_WORKER_MAX_ATTEMPTS / MEDIA_WORKER_RETRY_BASE_DELAY | 媒体阶段独立尝试上限与退避基数，默认3次 / 10秒 |
 
 听悟目前仍为配置占位符；OSS 适配器见下文。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
 
@@ -158,7 +161,7 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 
 记录、任务、幂等凭证在同一事务入库。同一键与同一规范化链接/备注重试返回已有记录；同一键提交不同内容返回409 `IDEMPOTENCY_CONFLICT`。同一用户重复链接返回已有记录，不新增任务，也不替换原备注和归属日期；其他用户拥有独立记录。规范化只调整协议/主机大小写、默认端口和片段，不删除或重排查询参数，以免破坏分享链接。平台资源 ID 去重在解析阶段继续补充。
 
-当前任务持久化为 `QUEUED`，此接口不调用云服务。后台解析通过下面的工作线程处理；媒体保存、转写和增强按后续独立模块接入。排队成功不等同于视频已总结完成。真实 MySQL 测试覆盖幂等、并发、用户隔离与任务写入失败时的事务回滚。
+当前任务持久化为 `QUEUED`，此接口不调用云服务。后台解析和媒体保存通过下面的工作线程处理；转写和增强按后续独立模块接入。排队成功不等同于视频已总结完成。真实 MySQL 测试覆盖幂等、并发、用户隔离与任务写入失败时的事务回滚。
 
 ## 投喂状态查询
 
@@ -176,7 +179,7 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 
 领取间隔允许250毫秒～1分钟，租约15秒～10分钟，尝试次数1～10，退避基数1秒～10分钟。启用时租约至少超过连接和读取空闲超时之和5秒；持续输出的 HTTP 响应可能超过空闲超时，最终仍由租约校验拒绝过期结果。配置不满足约束则启动失败。
 
-真实 MySQL 测试覆盖并发单次领取、跳过被锁任务、过期租约隔离、重试上限、永久失败、崩溃恢复和元数据事务回滚；设置 `PARSEVIDEO_TEST_BASE_URL` 还验证真实部署服务到数据库的解析链路。OSS 和听悟链路尚未完成，不应将 `MEDIA_PENDING` 展示为总结成功。
+真实 MySQL 测试覆盖并发单次领取、跳过被锁任务、过期租约隔离、重试上限、永久失败、崩溃恢复和元数据事务回滚；设置 `PARSEVIDEO_TEST_BASE_URL` 还验证真实部署服务到数据库的解析链路。`MEDIA_PENDING` 表示等待下文的媒体工作线程，不应展示为总结成功。
 
 ## 私有 OSS 媒体适配器
 
@@ -188,13 +191,13 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 
 契约测试通过真实 SDK 请求本机 HTTP 服务，检查 V4 签名、私有 ACL、完整性头、作用域、错误和无自动重试。真实验证需设置 `OSS_TEST_ENABLED=true`、`OSS_BUCKET`、`OSS_ENDPOINT` 及访问凭据，再运行 `mvnw verify`；测试只上传一个极小 PNG 到随机测试命名空间，验证签名下载、匿名访问拒绝和过期拒绝，最后删除本次创建的对象。未启用时该真实测试明确跳过；Bucket 不存在、非私有或凭据权限不足时测试失败，不调整已有设置。
 
-所需权限至少包含 Bucket ACL 查询以及目标对象前缀的 PutObject、GetObject、DeleteObject（删除用于测试清理/将来用户删除）；真实验证不得用模拟替代。此模块尚未从 parsevideo 下载视频、推进媒体任务或提供鉴权播放 API，相关业务按后续独立模块接入。
+所需权限至少包含 Bucket ACL 查询以及目标对象前缀的 PutObject、GetObject、DeleteObject（删除用于测试清理/将来用户删除）；真实验证不得用模拟替代。下载和任务推进由下文工作线程接入，鉴权播放 API 仍在后续独立模块实现。
 
 2026-10-06 开发验证已使用用户配置的深圳测试 Bucket 完成真实上传、重复上传、签名下载、匿名403、过期403与本次对象清理；凭据仅注入测试进程环境，没有写入源码或仓库。真实上传验证使用极小 PNG，不代表大视频、网络目标校验或整条转写链路已完成。
 
 ## 媒体下载适配器
 
-`SafeMediaDownloader` 将解析后的资源流式写入独立暂存文件，调用方通过 try-with-resources 关闭 `DownloadedMedia` 时删除文件。失败会中止 HTTP 请求并删除已创建文件；不会为释放连接继续读取超大响应。此模块仅下载，不自动领取 `MEDIA_PENDING` 任务或上传 OSS，后续媒体工作线程将连接这些适配器。
+`SafeMediaDownloader` 将解析后的资源流式写入独立暂存文件，调用方通过 try-with-resources 关闭 `DownloadedMedia` 时删除文件。失败会中止 HTTP 请求并删除已创建文件；不会为释放连接继续读取超大响应。下载适配器由下文媒体工作线程调用。
 
 仅接受标准端口的 HTTP(S) URL，拒绝凭据、片段及本机域名。HTTP socket 实际使用经 `PublicNetworkPolicy` 验证的 DNS 地址，混合公网/私网结果整体拒绝；IPv4 私网、loopback、链路本地、共享/保留/文档/多播地址与 IPv6 本地、文档及过渡地址均被拦截。每次重定向重新校验，禁止 HTTPS 降到 HTTP。系统代理、自动重试、自动重定向、cookie 和自动解压均不启用，避免绕过连接目标与大小校验。部署时仍应限制后端出站网络。
 
@@ -203,3 +206,17 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 根据文件头识别 MP4/QuickTime、Matroska/WebM、FLV，以及 PNG、JPEG、WebP、GIF，不信任响应声明的 MIME。格式识别不是完整解码验证；时长、轨道与可转写性仍需后续处理。HTML、图集、HLS/M3U8 与不识别的格式返回 `UNSUPPORTED_CONTENT`，不会保存为可播放成功记录。HTTP401/403 标记来源失效，后续媒体任务应重新解析分享链接获取资源，而非无限重试旧地址。
 
 设置 `MEDIA_TEST_PARSEVIDEO_BASE_URL` 后运行媒体真实测试，会调用解析服务的公开 B 站样本，下载实际封面和视频，校验文件类型并删除本次文件；未设置时明确跳过。2026-10-06 已用原生产连接校验下载651,508字节封面与51,973,319字节视频，12项本模块及启动验证通过。本机代理 Fake-IP DNS 曾返回198.18.x.x，被正确拦截；最终验证仅对测试 JVM 通过 `jdk.net.hosts.file` 注入阿里公共 DNS 的当时公网结果，未修改系统 DNS、未放开保留地址段。这些临时映射位于忽略目录，不能作为长期部署配置。
+
+## 后台媒体保存任务
+
+数据库迁移 V4 为任务增加独立的 `media_attempt_count`，新增 `fragment_stored_media` 保存用户、记录、VIDEO/COVER 类型、Bucket、对象键、大小、SHA-256、MIME 与保存时间。复合外键限制所有权；每条记录每种类型只有一个检查点，表中不保存限时播放地址。
+
+设置 `MEDIA_WORKER_ENABLED=true`、`PARSEVIDEO_ENABLED=true`、`OSS_ENABLED=true` 并配置服务后启用任务。状态依次为 `MEDIA_PENDING → MEDIA_SAVING → TRANSCRIPTION_PENDING`。使用 MySQL `FOR UPDATE SKIP LOCKED` 领取，到期租约可以恢复；写检查点、更新解析结果和推进阶段都检查任务 ID、用户、记录、租约身份、版本及有效期。网络下载、重新解析和 OSS 上传均在短数据库事务之外执行。
+
+视频和封面逐个上传并立即提交检查点。视频已保存而封面失败时，重启或重试只处理封面。HTTP401/403 会在本次尝试内重新解析分享链接一次，持久化新地址并继续缺失资源；再次失效进入有上限的退避，避免重复使用旧地址或无限解析。永久错误直接停止；媒体尝试上限独立于解析阶段，状态 API 的 `attemptCount` 为跨阶段总次数。租约默认30分钟，配置需覆盖两轮下载和解析的预计时限；OSS 读取空闲超时不是整个上传的硬时限，任何超出租约的结果仍被拒绝入库。
+
+没有封面地址时允许保存视频后等待转写；有封面时必须完成两个检查点才能推进。`TRANSCRIPTION_PENDING` 仅表示媒体已保存，听悟、摘要和知识索引仍待实现。素材长期保留，公开播放接口将在单独模块中实现。正常失败/结束清理暂存文件；进程突然中断可能遗留暂存文件或已上传但未提交的对象，自动回收尚未实现。旧租约不会自动删除内容寻址对象，以免误删新租约正在使用的同一对象。
+
+MySQL 测试验证阶段原子性、断点恢复、来源刷新、有限重试、永久错误、并发领取、锁跳过、租约过期隔离、错误所有权与数据库回滚。设置 `MEDIA_WORKER_TEST_ENABLED=true`、`MEDIA_WORKER_TEST_PARSEVIDEO_BASE_URL`、OSS 配置与阿里凭据，再运行 `Server/scripts/Test-MySql.ps1` 可启用真实解析→下载→私有 OSS→MySQL 验证；使用公开 B 站样例，检查两个对象的私有 ACL、大小与 SHA-256 元数据，最后只删除本次独立测试命名空间中创建的对象。未启用时明确跳过，模拟适配器测试不能替代这个真实闭环。
+
+2026-10-06 真实媒体任务11项验证全部通过，测试对象与暂存文件已清理；本轮同样仅对测试 JVM 使用当时公网 DNS 映射解决本机 Fake-IP，生产校验未放宽。独立的后端兼容性验证共89项，81项通过，8项真实外部调用按开关跳过；聊天真实验证与此前其他云适配器验证均单独记录，不将跳过项算作通过。

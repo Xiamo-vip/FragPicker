@@ -13,6 +13,7 @@ public class IngestionJob {
     private Long userId;
     private String stage;
     private Integer attemptCount;
+    private Integer mediaAttemptCount;
     private LocalDateTime nextAttemptAt;
     private String leaseOwner;
     private LocalDateTime leaseExpiresAt;
@@ -30,6 +31,8 @@ public class IngestionJob {
     public void setStage(String value) { stage = value; }
     public Integer getAttemptCount() { return attemptCount; }
     public void setAttemptCount(Integer value) { attemptCount = value; }
+    public Integer getMediaAttemptCount() { return mediaAttemptCount; }
+    public void setMediaAttemptCount(Integer value) { mediaAttemptCount = value; }
     public LocalDateTime getNextAttemptAt() { return nextAttemptAt; }
     public void setNextAttemptAt(LocalDateTime value) { nextAttemptAt = value; }
     public String getLeaseOwner() { return leaseOwner; }
