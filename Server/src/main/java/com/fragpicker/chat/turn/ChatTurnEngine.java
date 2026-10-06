@@ -84,12 +84,14 @@ public class ChatTurnEngine {
         var stream = new RoundStream();
         try {
             try { model.chat(request, stream); } catch (RuntimeException supplier) { stream.fail("CHAT_PROVIDER_UNAVAILABLE"); }
+            long lastDelivery = System.nanoTime();
             while (true) {
                 check(cancellation, deadline);
                 String delta;
                 try { delta = stream.deltas.poll(50, TimeUnit.MILLISECONDS); }
                 catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw failure(HttpStatus.REQUEST_TIMEOUT, "CHAT_CANCELLED"); }
-                if (delta != null) { String text = delta; deliver(() -> listener.delta(round, text)); }
+                if (delta != null) { String text = delta; deliver(() -> listener.delta(round, text)); lastDelivery = System.nanoTime(); }
+                else if (System.nanoTime() - lastDelivery >= TimeUnit.SECONDS.toNanos(3)) { deliver(listener::heartbeat); lastDelivery = System.nanoTime(); }
                 if (stream.complete.isDone() && stream.deltas.isEmpty()) {
                     try { return stream.complete.join(); }
                     catch (CompletionException invalid) { throw invalid.getCause() instanceof ApiException stable ? stable : failure(HttpStatus.BAD_GATEWAY, "CHAT_PROVIDER_UNAVAILABLE"); }

@@ -429,3 +429,30 @@ V9 增加 `chat_turns` 和 `chat_turn_sources`，保存当前问题、RUNNING/CO
 编号必须为正的有符号64位整数，非法编号400 `INVALID_CHAT_ID`；其他用户或不存在的会话统一404 `CHAT_SESSION_NOT_FOUND`，本人会话中其他会话的消息或不存在的消息统一404 `CHAT_TURN_NOT_FOUND`。附加 userId 不改变归属，未登录或已注销令牌返回401。响应不包含租约标识、过期时间、令牌版本、幂等键、推理内容或云内部信息。来源里的视频/封面路径需再带登录调用媒体授权接口。
 
 2026-10-06 读取接口4项真实 HTTP/MySQL 验证、问答存储7项和会话创建5项，共16项全部通过，构建与打包成功。覆盖已完成正文及来源时间、处理中与过期恢复、用户/会话双重隔离、输入边界和真实注销后的401；本轮未调用模型或云媒体。发送消息与 SSE 投递仍待下一模块接入。
+
+## 发送消息与 SSE API
+
+`POST /api/v1/chat/sessions/{sessionId}/messages` 需要 Bearer 登录、UUID `Idempotency-Key` 和 JSON `{"message":"请找一下我保存的导数学习资料"}`。问题最多2000个 Unicode 字符，允许 LF 和制表符；上下文从数据库加载，请求中的 userId、roles 或 history 不参与模型输入。成功响应为200 `text/event-stream`、`Cache-Control: no-store`、`X-Accel-Buffering: no`。连接建立前的输入、所有权和容量错误返回 JSON，即使请求 Accept 仅指定 SSE；客户端需先检查 HTTP 状态和 Content-Type。
+
+事件包含递增的 `id: turnId:sequence`，data 是 JSON：
+
+| event | data 与客户端含义 |
+| --- | --- |
+| accepted | turnId、sessionId、state、replayed；先保存问题和租约，再开始生成 |
+| round_start | round；开始一个模型响应轮次 |
+| delta | round、text；按轮次追加草稿，文字含换行时仍使用 JSON 编码 |
+| round_end | round、intermediate；true 表示工具前过渡说明，false 表示最终正文轮次 |
+| heartbeat | turnId；模型静默期间约每3秒检测连接，不包含推理内容 |
+| done | 完整消息快照；答案及来源已原子提交，可读取/恢复 |
+| pending / failed | 同键重放运行中/失败的消息快照，不重新调用模型 |
+| error | 稳定 code、message；读取消息接口确认持久化状态 |
+
+最终卡片只来自服务端检索注册表，视频/封面路径需要登录后再获取媒体地址；推理和工具参数不会进入 SSE。客户端不能把流式草稿或 round_end 当作保存成功，只有 done 表示可恢复的完成状态。完成提交后发生断线仍保留结果，可通过读取接口或同键重连恢复。
+
+同键同问题返回 accepted 后仅发送 done、pending 或 failed，随后关闭连接；同键不同问题409，另一键遇到同会话生成中409。不支持 Last-Event-ID 增量补发；重连恢复的是整条已保存消息。重新尝试失败问题必须明确使用新键，不自动重试付费模型请求。进程中断或数据库不可用时，原 RUNNING 租约会由下一次读取/创建请求过期处理。
+
+每实例使用与 `CHAT_MAX_CONCURRENT` 相同大小的专用线程池，无排队；满载429 `CHAT_BUSY`，已经创建的新轮次标为 FAILED。SSE 连接预算为整轮预算加15秒；生成期间断线会取消传输并终止本轮。心跳不能强制中断 JDBC/ONNX，也不能保证已发送的云请求立即停止计费。异步请求沿用现有鉴权配置，未添加全局 ASYNC 放行。
+
+2026-10-06 模块验证共25项全部通过，包括4项真实 HTTP/MySQL SSE 契约、1项真实 DeepSeek/MySQL/本地 ONNX 两轮 HTTP 对话、9项编排、7项存储和4项读取回归。覆盖真实增量、提交后完成事件、同键重连无重复调用、失败重放、安静期间断线取消、鉴权与归属，以及来源卡片。设置 `CHAT_API_TEST_ENABLED=true` 并加载本机聊天环境变量，运行 `Server/scripts/Test-MySql.ps1` 可重跑这项付费验证。媒体检查点使用数据库夹具，本轮未重新上传 OSS 或验证 Android 播放。
+
+完整无密钥后端回归205项，190项通过、15项可选真实外部调用按开关跳过，构建与打包成功。

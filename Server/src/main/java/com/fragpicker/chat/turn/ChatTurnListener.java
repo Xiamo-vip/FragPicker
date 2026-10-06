@@ -6,4 +6,5 @@ public interface ChatTurnListener {
     default void delta(int round, String text) { }
     /** If intermediate=true, this round is tool narration, not the persisted final answer. */
     default void roundEnded(int round, boolean intermediate) { }
+    default void heartbeat() { }
 }
