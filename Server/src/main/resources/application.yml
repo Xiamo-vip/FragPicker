@@ -28,7 +28,13 @@ fragpicker:
   business-zone: Asia/Shanghai
   integrations:
     parsevideo:
+      enabled: ${PARSEVIDEO_ENABLED:false}
       base-url: ${PARSEVIDEO_BASE_URL:}
+      connect-timeout: ${PARSEVIDEO_CONNECT_TIMEOUT:5s}
+      read-timeout: ${PARSEVIDEO_READ_TIMEOUT:45s}
+      max-response-bytes: ${PARSEVIDEO_MAX_RESPONSE_BYTES:1048576}
+      username: ${PARSEVIDEO_USERNAME:}
+      password: ${PARSEVIDEO_PASSWORD:}
     tingwu:
       app-key: ${TINGWU_APP_KEY:}
     oss:

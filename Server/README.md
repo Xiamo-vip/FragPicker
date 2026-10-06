@@ -90,7 +90,10 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | JWT_SIGNING_KEY | 至少32字节随机密钥的 Base64 值 |
 | JWT_ACCESS_TOKEN_TTL | 访问令牌时长，默认15分钟 |
 | JWT_REFRESH_TOKEN_TTL | 刷新会话绝对有效期，默认30天 |
-| PARSEVIDEO_BASE_URL | 已部署的视频解析服务地址 |
+| PARSEVIDEO_ENABLED / PARSEVIDEO_BASE_URL | 启用解析客户端（默认 false）及服务根地址 |
+| PARSEVIDEO_CONNECT_TIMEOUT / PARSEVIDEO_READ_TIMEOUT | 连接与读取超时，默认5秒 / 45秒 |
+| PARSEVIDEO_MAX_RESPONSE_BYTES | 解析响应上限，默认1 MiB |
+| PARSEVIDEO_USERNAME / PARSEVIDEO_PASSWORD | 可选 Basic Auth 凭据，必须成对配置 |
 | TINGWU_APP_KEY | 听悟应用 AppKey |
 | OSS_BUCKET / OSS_ENDPOINT | 私有对象存储 Bucket 与 Endpoint |
 | ALIBABA_CLOUD_ACCESS_KEY_ID / ALIBABA_CLOUD_ACCESS_KEY_SECRET | 阿里云访问凭据 |
@@ -101,7 +104,7 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | AI_CHAT_TIMEOUT | 调用超时，默认60秒，允许1秒～5分钟 |
 | AI_CHAT_MAX_OUTPUT_TOKENS | 最大输出 token 数，默认4096，允许1～32768 |
 
-parsevideo、听悟和 OSS 目前仍为配置占位符。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
+听悟和 OSS 目前仍为配置占位符。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
 
 ## OpenAI 兼容聊天模型
 
@@ -122,3 +125,11 @@ parsevideo、听悟和 OSS 目前仍为配置占位符。设置环境变量后�
 为控制推理负载，文档片段限384 Unicode 码点，查询限256码点，批次限16条，推理串行执行；这些是应用输入边界，不等同于 tokenizer 的 token 数。长转写必须由后续索引模块分片，不能静默截断。此模块提供真实本地模型推理与中文检索样例测试，数据库索引、用户数据筛选和检索接口仍在后续模块实现。
 
 模型依据：[LangChain4j 本地 ONNX 模型](https://docs.langchain4j.dev/integrations/embedding-models/in-process/)、[BGE 中文模型说明](https://huggingface.co/BAAI/bge-small-zh-v1.5)。中文样例用于验证基础召回顺序，不代表所有资料都达到固定准确率。
+
+## parsevideo 解析适配器
+
+设置 `PARSEVIDEO_ENABLED=true` 和服务根地址 `PARSEVIDEO_BASE_URL` 后启用 `ParseVideoClient`。调用 `GET /video/share/url/parse?url=...`，完整编码分享 URL，保留服务地址的路径前缀。按部署服务的 `code/msg/data` 包装提取 `video_url`、`cover_url`、`title`、`author.name/uid/avatar`；缺失的可选元数据保留为空，不虚构作者或标题。纯图集暂不进入视频转写流程。
+
+连接超时允许1～30秒，读取空闲超时允许1～120秒，响应上限允许16 KiB～4 MiB；禁止自动重定向和重试。错误映射为稳定代码和可重试标记，不把供应商内部消息、访问凭据或临时签名媒体地址写入异常与日志。可选 Basic Auth 只允许 HTTPS 或 loopback HTTP。媒体 URL 在此阶段仅解析；后续下载阶段还须校验网络目标和重定向，不能直接信任解析结果。
+
+契约测试使用本机 HTTP 服务；真实部署验证可在运行后端测试前设置 `PARSEVIDEO_TEST_BASE_URL`，使用[解析项目文档](https://github.com/baige778/parse-video-py)的公开 B 站示例完成验证。未设置时明确跳过该真实测试。此模块尚未下载媒体或调用听悟，后续通过持久化投喂任务接入。
