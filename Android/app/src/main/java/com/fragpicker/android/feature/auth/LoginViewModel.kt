@@ -21,6 +21,22 @@ class LoginViewModel(private val repository: AuthRepository) : ViewModel() {
         if (!state.value.loading) mutableState.value = state.value.copy(error = null)
     }
 
+    fun logout() {
+        if (state.value.loading || state.value.user == null) return
+        val previous = state.value
+        mutableState.value = previous.copy(loading = true, error = null)
+        viewModelScope.launch {
+            try {
+                val confirmed = repository.logout()
+                mutableState.value = LoginUiState(loading = false,
+                    error = if (confirmed) null else "此设备已退出，服务器会话撤销未能确认。")
+            } catch (error: CancellationException) { throw error }
+            catch (_: Exception) {
+                mutableState.value = previous.copy(loading = false, error = "本机会话清理失败，请重试退出。")
+            }
+        }
+    }
+
     init {
         viewModelScope.launch {
             try { mutableState.value = LoginUiState(loading = false, user = repository.restore()) }

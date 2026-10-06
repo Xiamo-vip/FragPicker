@@ -32,6 +32,8 @@ class AuthApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
 
     suspend fun currentUser(accessToken: String): UserProfile = user(request("GET", "/api/v1/users/me", bearer = accessToken))
 
+    suspend fun logout(accessToken: String) { request("POST", "/api/v1/auth/logout", bearer = accessToken) }
+
     private fun session(json: JSONObject): LoginSession {
         require(json.getString("tokenType") == "Bearer") { "Unsupported session type" }
         return LoginSession(json.getString("accessToken"), json.getString("refreshToken"), user(json.getJSONObject("user")))
@@ -71,7 +73,7 @@ class AuthApi(private val baseUrl: String = BuildConfig.API_BASE_URL) {
                     val code = try { JSONObject(text).optString("code", "HTTP_ERROR") } catch (_: Exception) { "HTTP_ERROR" }
                     throw AuthApiFailure(status, code)
                 }
-                JSONObject(text)
+                if (status == 204) JSONObject() else JSONObject(text)
             } finally { connection.disconnect() }
         }
 }

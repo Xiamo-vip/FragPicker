@@ -75,6 +75,14 @@ class MainActivity : ComponentActivity() {
                                     Text("每日回顾时区：${user.businessZone}", style = MaterialTheme.typography.bodyMedium)
                                 }
                             }
+                            account.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                            Text("退出登录将撤销此账号在所有设备上的会话。", style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            OutlinedButton(onClick = {
+                                registeredUsername = ""; showRegistration = false; login.logout()
+                            }, enabled = !account.loading, modifier = Modifier.fillMaxWidth()) {
+                                Text(if (account.loading) "正在退出…" else "退出登录")
+                            }
                         }
                         HorizontalDivider()
                         Text("外观", style = MaterialTheme.typography.titleMedium)
