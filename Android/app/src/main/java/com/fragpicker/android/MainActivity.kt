@@ -8,8 +8,6 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.*
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,10 +18,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.fragpicker.android.core.theme.*
+import com.fragpicker.android.core.auth.*
+import com.fragpicker.android.feature.auth.*
 
 class MainActivity : ComponentActivity() {
     private val theme: ThemeViewModel by viewModels {
         viewModelFactory { initializer { ThemeViewModel(ThemeRepository(applicationContext)) } }
+    }
+    private val login: LoginViewModel by viewModels {
+        viewModelFactory { initializer { LoginViewModel(AuthRepository(AuthApi(), SessionVault(applicationContext))) } }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,24 +34,27 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val mode by theme.mode.collectAsStateWithLifecycle()
+            val account by login.state.collectAsStateWithLifecycle()
             FragmentsPickerTheme(mode) {
                 Scaffold { padding ->
                     Column(
-                        Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
-                            .padding(horizontal = 28.dp, vertical = 32.dp),
+                        Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState())
+                            .padding(horizontal = 28.dp, vertical = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
                         Text("FragmentsPicker", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer) {
-                            Column(Modifier.fillMaxWidth().padding(28.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                                Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(48.dp))
-                                Text("零散灵感，\n值得被记住。", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-                                Text("把喜欢的内容，留成自己的知识。", style = MaterialTheme.typography.bodyLarge)
+                        val user = account.user
+                        if (user == null) {
+                            LoginScreen(account, login::login)
+                        } else {
+                            Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer) {
+                                Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    Text("欢迎回来，${user.username}", style = MaterialTheme.typography.headlineSmall)
+                                    Text("已登录你的个人知识空间", style = MaterialTheme.typography.bodyLarge)
+                                    Text("每日回顾时区：${user.businessZone}", style = MaterialTheme.typography.bodyMedium)
+                                }
                             }
                         }
-                        Text("你的个人知识空间", style = MaterialTheme.typography.titleMedium)
-                        Text("收集有价值的视频，在每天的回顾中梳理重点，也在需要时重新找回灵感。",
-                            style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         HorizontalDivider()
                         Text("外观", style = MaterialTheme.typography.titleMedium)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

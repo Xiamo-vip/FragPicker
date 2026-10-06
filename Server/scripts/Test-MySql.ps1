@@ -1,4 +1,4 @@
-param([string]$MySqlBin)
+param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0)
 
 $ErrorActionPreference = 'Stop'
 if (-not $MySqlBin) {
@@ -18,10 +18,12 @@ $listener.Start()
 $port = $listener.LocalEndpoint.Port
 $listener.Stop()
 $savedEnvironment = @{}
-foreach ($name in @('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD','JWT_SIGNING_KEY')) {
+foreach ($name in @('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD','JWT_SIGNING_KEY',
+        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','AI_CHAT_ENABLED')) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 $testProcess = $null
+$apiProcess = $null
 try {
     $env:MYSQL_PWD = $null
     & $mysqld '--no-defaults' '--initialize-insecure' "--basedir=$mysqlBase" "--datadir=$dataPath" '--console' *> (Join-Path $testRoot 'initialize.log')
@@ -50,7 +52,40 @@ try {
     Write-Output "Running integration tests on isolated MySQL at localhost:$port. Existing MySQL service is untouched."
     & (Join-Path $serverRoot 'mvnw.cmd') '-B' '-ntp' '-f' (Join-Path $serverRoot 'pom.xml') 'verify'
     if ($LASTEXITCODE -ne 0) { throw 'MySQL integration verification failed' }
+    if ($AndroidAuth) {
+        $httpListener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $HttpPort)
+        $httpListener.Start()
+        $HttpPort = $httpListener.LocalEndpoint.Port
+        $httpListener.Stop()
+        if ($HttpPort -lt 1024 -or $HttpPort -gt 65535) { throw 'HttpPort must be 1024 to 65535' }
+        $env:DB_URL = $env:DB_TEST_URL
+        $env:DB_USERNAME = $env:DB_TEST_USERNAME
+        $env:DB_PASSWORD = $env:DB_TEST_PASSWORD
+        $env:SERVER_PORT = "$HttpPort"
+        $env:AI_CHAT_ENABLED = 'false'
+        $jar = Join-Path $serverRoot 'target/fragpicker-server-0.1.0-SNAPSHOT.jar'
+        $javaExe = Join-Path $env:JAVA_HOME 'bin/java.exe'
+        $apiProcess = Start-Process -FilePath $javaExe -ArgumentList '-jar', "`"$jar`"",
+            '--spring.profiles.active=database', '--server.address=127.0.0.1' -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput (Join-Path $testRoot 'api-stdout.log') -RedirectStandardError (Join-Path $testRoot 'api-stderr.log')
+        $healthy = $false
+        for ($attempt=0; $attempt -lt 120; $attempt++) {
+            if ($apiProcess.HasExited) { throw "Test backend exited; see $testRoot/api-stderr.log" }
+            try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$HttpPort/actuator/health" -TimeoutSec 1
+                if ($health.status -eq 'UP') { $healthy = $true; break }
+            } catch { }
+            Start-Sleep -Milliseconds 250
+        }
+        if (-not $healthy) { throw 'Isolated backend did not become healthy' }
+        Write-Output 'Running Android login integration against the isolated real backend and database.'
+        & (Join-Path $workspaceRoot 'Android/gradlew.bat') '-p' (Join-Path $workspaceRoot 'Android') `
+            "-PAPI_BASE_URL=http://10.0.2.2:$HttpPort" '-Pandroid.testInstrumentationRunnerArguments.realBackend=true' `
+            ':app:assembleDebug' ':app:lintDebug' ':app:connectedDebugAndroidTest'
+        if ($LASTEXITCODE -ne 0) { throw 'Android authentication verification failed' }
+    }
 } finally {
+    if ($apiProcess -and -not $apiProcess.HasExited) { Stop-Process -Id $apiProcess.Id }
     if ($testProcess -and -not $testProcess.HasExited) {
         & $mysqladmin '--no-defaults' '--host=127.0.0.1' "--port=$port" '--user=root' 'shutdown' *> $null
         if (-not $testProcess.WaitForExit(5000)) { Stop-Process -Id $testProcess.Id }

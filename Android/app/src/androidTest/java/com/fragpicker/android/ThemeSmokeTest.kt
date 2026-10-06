@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelected
 import org.junit.Rule
@@ -16,16 +17,16 @@ class ThemeSmokeTest {
     @Test
     fun switchesAppearanceAndRestoresItAfterRecreation() {
         compose.onNodeWithText("FragmentsPicker").assertIsDisplayed()
-        compose.onNodeWithText("深色").performClick()
+        compose.onNodeWithText("深色").performScrollTo().performClick()
         waitForSelected("深色")
         compose.onNodeWithText("深色").assertIsSelected()
         compose.activityRule.scenario.recreate()
         waitForSelected("深色")
         compose.onNodeWithText("深色").assertIsSelected()
-        compose.onNodeWithText("浅色").performClick()
+        compose.onNodeWithText("浅色").performScrollTo().performClick()
         waitForSelected("浅色")
         compose.onNodeWithText("浅色").assertIsSelected()
-        compose.onNodeWithText("跟随系统").performClick()
+        compose.onNodeWithText("跟随系统").performScrollTo().performClick()
         waitForSelected("跟随系统")
     }
 

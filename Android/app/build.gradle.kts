@@ -1,8 +1,13 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val configuredApiUrl = providers.gradleProperty("API_BASE_URL").orNull
+fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "com.fragpicker.android"
@@ -16,12 +21,25 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
+    buildTypes {
+        debug { buildConfigField("String", "API_BASE_URL", quoted(configuredApiUrl ?: "http://10.0.2.2:18080")) }
+        release { buildConfigField("String", "API_BASE_URL", quoted(configuredApiUrl ?: "https://unconfigured.invalid")) }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    doFirst {
+        val uri = configuredApiUrl?.let { URI(it) }
+        require(uri?.scheme == "https" && uri.host != null && uri.userInfo == null && uri.query == null && uri.fragment == null) {
+            "Release requires -PAPI_BASE_URL=https://your-backend; do not include credentials or query parameters"
+        }
+    }
 }
 
 dependencies {
