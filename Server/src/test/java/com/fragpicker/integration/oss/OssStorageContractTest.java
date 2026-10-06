@@ -113,6 +113,21 @@ class OssStorageContractTest {
     }
 
     @Test
+    void signsLongLivedTranscriptionInputWithoutRelaxingPlaybackLimits() {
+        String key = "users/10/fragments/20/video/" + "a".repeat(64);
+        var input = storage.signedGetForTranscription(10, 20, key, Duration.ofHours(4));
+        assertThat(input.expiresAt()).isBetween(Instant.now().plusSeconds(14398), Instant.now().plusSeconds(14401));
+        var expires = java.util.regex.Pattern.compile("(?:^|&)x-oss-expires=(\\d+)").matcher(input.url().getRawQuery());
+        assertThat(expires.find()).isTrue();
+        assertThat(Long.parseLong(expires.group(1))).isBetween(14398L, 14400L);
+        assertThatThrownBy(() -> storage.signedGetForTranscription(11, 20, key, Duration.ofHours(4))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> storage.signedGetForTranscription(10, 20, key, Duration.ofMinutes(5))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> storage.signedGetForTranscription(10, 20, key, Duration.ofDays(1))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> storage.signedGet(10, 20, MediaKind.VIDEO, key, Duration.ofHours(4))).isInstanceOf(IllegalArgumentException.class);
+        assertThat(calls).hasValue(0);
+    }
+
+    @Test
     void validatesFileSizeAndTypesBeforeAnyCloudRequest() throws Exception {
         var file = Files.write(directory.resolve("cover.png"), new byte[]{1, 2, 3});
         var limited = new OssMediaStorage(client, props(2), Clock.systemUTC());

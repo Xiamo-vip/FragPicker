@@ -52,6 +52,19 @@ public class OssMediaStorage {
 
     public SignedMediaUrl signedGet(long userId, long fragmentId, MediaKind kind, String key, Duration ttl) {
         requireOwnedKey(userId, fragmentId, kind, key); OssProperties.validateTtl(ttl);
+        return sign(key, ttl);
+    }
+
+    /** Internal Tingwu input only. Never expose this longer-lived capability as a playback URL. */
+    public SignedMediaUrl signedGetForTranscription(long userId, long fragmentId, String key, Duration ttl) {
+        requireOwnedKey(userId, fragmentId, MediaKind.VIDEO, key);
+        if (ttl == null || ttl.compareTo(Duration.ofHours(3)) < 0 || ttl.compareTo(Duration.ofHours(12)) > 0) {
+            throw new IllegalArgumentException("Transcription URL TTL must be 3..12 hours");
+        }
+        return sign(key, ttl);
+    }
+
+    private SignedMediaUrl sign(String key, Duration ttl) {
         Instant expiry = clock.instant().plus(ttl).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
         var request = new GeneratePresignedUrlRequest(properties.bucket(), key, HttpMethod.GET);
         request.setExpiration(Date.from(expiry));

@@ -17,6 +17,8 @@ logging:
   level:
     com.aliyun.oss: 'OFF'
     org.apache.http: 'OFF'
+    com.aliyun.tea: 'OFF'
+    com.aliyun.teaopenapi: 'OFF'
 
 management:
   endpoints:
@@ -63,7 +65,14 @@ fragpicker:
       username: ${PARSEVIDEO_USERNAME:}
       password: ${PARSEVIDEO_PASSWORD:}
     tingwu:
+      enabled: ${TINGWU_ENABLED:false}
       app-key: ${TINGWU_APP_KEY:}
+      source-language: ${TINGWU_SOURCE_LANGUAGE:auto}
+      connect-timeout: ${TINGWU_CONNECT_TIMEOUT:5s}
+      read-timeout: ${TINGWU_READ_TIMEOUT:30s}
+      result-timeout: ${TINGWU_RESULT_TIMEOUT:60s}
+      max-result-bytes: ${TINGWU_MAX_RESULT_BYTES:16777216}
+      source-url-ttl: ${TINGWU_SOURCE_URL_TTL:4h}
     oss:
       enabled: ${OSS_ENABLED:false}
       bucket: ${OSS_BUCKET:}

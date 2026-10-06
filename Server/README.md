@@ -119,7 +119,7 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | MEDIA_WORKER_POLL_DELAY / MEDIA_WORKER_LEASE_DURATION | 轮询间隔与租约，默认2秒 / 30分钟 |
 | MEDIA_WORKER_MAX_ATTEMPTS / MEDIA_WORKER_RETRY_BASE_DELAY | 媒体阶段独立尝试上限与退避基数，默认3次 / 10秒 |
 
-听悟目前仍为配置占位符；OSS 适配器见下文。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
+听悟、OSS 适配器见下文。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
 
 ## OpenAI 兼容聊天模型
 
@@ -220,3 +220,25 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 MySQL 测试验证阶段原子性、断点恢复、来源刷新、有限重试、永久错误、并发领取、锁跳过、租约过期隔离、错误所有权与数据库回滚。设置 `MEDIA_WORKER_TEST_ENABLED=true`、`MEDIA_WORKER_TEST_PARSEVIDEO_BASE_URL`、OSS 配置与阿里凭据，再运行 `Server/scripts/Test-MySql.ps1` 可启用真实解析→下载→私有 OSS→MySQL 验证；使用公开 B 站样例，检查两个对象的私有 ACL、大小与 SHA-256 元数据，最后只删除本次独立测试命名空间中创建的对象。未启用时明确跳过，模拟适配器测试不能替代这个真实闭环。
 
 2026-10-06 真实媒体任务11项验证全部通过，测试对象与暂存文件已清理；本轮同样仅对测试 JVM 使用当时公网 DNS 映射解决本机 Fake-IP，生产校验未放宽。独立的后端兼容性验证共89项，81项通过，8项真实外部调用按开关跳过；聊天真实验证与此前其他云适配器验证均单独记录，不将跳过项算作通过。
+
+## 通义听悟离线转写适配器
+
+使用官方 `com.aliyun:tingwu20230930:2.0.26` SDK。设置 `TINGWU_ENABLED=true`、`TINGWU_APP_KEY` 和共享阿里凭据后创建云客户端；固定通过 HTTPS 访问北京地域听悟 OpenAPI，OSS Bucket 可以继续位于深圳。`TINGWU_SOURCE_LANGUAGE` 默认 auto，也支持 cn/en/yue/ja/ko。只开启语音转写、全文摘要 Paragraph 和关键信息 KeyInformation，不开启翻译、PPT 抽取或推送回调。聊天模型仍是单独的 DeepSeek 配置。
+
+`TingwuClient.create` 返回任务 ID，`get` 映射 ONGOING/COMPLETED/FAILED/INVALID，以及受限失败分类；不转发原始供应商错误消息。TaskKey 是自定义关联标识，官方协议未承诺其具有幂等性。SDK 自动重试关闭：创建请求超时、5xx 或无法确认任务 ID 时返回 `SUBMISSION_UNCERTAIN`，调用方须保留提交意图并核对结果，不能盲目重新创建付费任务。查询失败可以有限重试；永久鉴权/参数错误不能自动重试。
+
+私有 OSS 为听悟生成专用媒体链接：`signedGetForTranscription` 仅允许当前用户/记录的视频键，有效期3～12小时；`TINGWU_SOURCE_URL_TTL` 默认4小时，以覆盖听悟的排队与下载窗口。该链接是后端内部能力，不作为客户端播放地址。普通播放签名仍限制在30秒～1小时。源文件长期保留不受签名到期影响。
+
+`TingwuResultReader` 下载完成任务的转写、摘要与智能纪要 JSON，校验结果 TaskId。按 ParagraphId、SpeakerId 和 SentenceId 合并词项，保留起止毫秒；读取全文摘要、关键词与带时间戳重点。未生成的可选算法结果保留为空，不虚构摘要；听悟的场景分类不等于应用的知识主题分类。主题分类、知识入库和检索将在后续业务模块完成。
+
+结果下载仅接受公网地域 OSS 域名，文档中 HTTP OSS 地址提升到 HTTPS，原始路径与签名查询保持不变。socket 使用经校验的公网 DNS 地址，不启用系统代理、重定向或自动重试；不附加阿里 Authorization 头。默认连接5秒、读取空闲30秒、每份结果的 HTTP 总时限60秒、结果上限16 MiB，可通过 `TINGWU_CONNECT_TIMEOUT`、`TINGWU_READ_TIMEOUT`、`TINGWU_RESULT_TIMEOUT`、`TINGWU_MAX_RESULT_BYTES` 调整。失效结果返回 `RESULT_EXPIRED`，调用方应重新查询任务获取链接，不重新转写源文件。SDK 原始日志与异常正文不暴露到 API。
+
+真实验证默认跳过。设置 `TINGWU_TEST_ENABLED=true`、`TINGWU_TEST_MEDIA_PATH`（小于5 MiB的合成中文 WAV）、`TINGWU_TEST_CHECKPOINT_PATH`（忽略目录中的独立 JSON 文件）、AppKey、阿里凭据和 OSS 配置，再运行 `./mvnw.cmd "-Dtest=TingwuLiveIntegrationTest,TingwuContractTest,TingwuResultReaderTest,OssStorageContractTest" test`。首次上传合成语音并创建一个付费任务；检查点在提交前写入，后续超时运行复用任务 ID，每15秒查询一次，最多等待5分钟。提交结果不确定时保留检查点并拒绝自动重建；完成后清理本次测试源对象，不删除云端任务记录。
+
+2026-10-06 已验证私有 OSS 输入→真实听悟创建/查询→原文、摘要、关键词与重点结果解析，30.585秒合成中文语音产生3段原文、10个关键词和1个重点；17项本模块及 OSS 兼容验证全部通过。本机 Fake-IP 环境仅对测试 JVM 注入实际 OSS 结果主机的当时公网 DNS 映射，生产限制未放宽。转写工作线程和知识数据库尚未接入，媒体任务仍停在 `TRANSCRIPTION_PENDING`，不能展示为总结完成。
+
+新增 SDK 后，完整后端兼容性检查共101项，92项通过、9项真实外部调用在该轮跳过，构建与打包成功；真实聊天、媒体保存和听悟验证均按各自开关单独执行，结果见各模块记录。
+
+若本机 Maven 镜像尚未同步该 SDK，可通过 `mvnw -s <独立 settings.xml>` 临时选择 Maven Central；本轮使用忽略目录中的测试配置，未修改全局 Maven 设置，仓库依赖仍按标准 Maven Central 坐标声明。
+
+协议依据：[离线转写及签名 URL 窗口](https://help.aliyun.com/zh/tingwu/offline-transcribe-of-audio-and-video-files)、[任务查询](https://help.aliyun.com/zh/tingwu/api-tingwu-2023-09-30-gettaskinfo)、[转写结构](https://help.aliyun.com/zh/tingwu/voice-transcription)、[摘要结构](https://help.aliyun.com/zh/tingwu/large-model-summary/)。
