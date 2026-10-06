@@ -82,6 +82,13 @@ public class SessionTokenService {
                 rawToken, Math.max(0, Duration.between(now(), expiresAt).toSeconds()), UserResponse.from(user));
     }
 
+    @Transactional
+    public void logout(Long userId) {
+        var user = users.lockById(userId);
+        if (user == null) { throw invalidRefresh(); }
+        revokeAllLocked(user);
+    }
+
     void revokeAllLocked(UserAccount user) {
         refreshTokens.update(null, Wrappers.<RefreshTokenRecord>lambdaUpdate()
                 .eq(RefreshTokenRecord::getUserId, user.getId()).isNull(RefreshTokenRecord::getRevokedAt)
