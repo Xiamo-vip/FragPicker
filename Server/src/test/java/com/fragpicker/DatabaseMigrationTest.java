@@ -38,7 +38,7 @@ class DatabaseMigrationTest {
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
         assertThat(dataSource.getMaximumPoolSize()).isEqualTo(4);
         assertThat(dataSource.getMinimumIdle()).isZero();
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("8");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("9");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))
@@ -111,6 +111,9 @@ class DatabaseMigrationTest {
                         assertThat(row.next()).isTrue(); assertThat(row.getString("summary")).isEqualTo("原始导数摘要"); assertThat(row.getString("title")).isEqualTo("升级后的数学对话");
                     }
                 }
+                assertThat(Flyway.configure().dataSource(url, username, password).target("9").load().migrate().migrationsExecuted).isEqualTo(1);
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement();
+                     var row = statement.executeQuery("SELECT title FROM chat_sessions WHERE user_id = 1")) { assertThat(row.next()).isTrue(); assertThat(row.getString("title")).isEqualTo("升级后的数学对话"); }
             } finally { ddl.execute("DROP DATABASE " + schema); }
         }
     }

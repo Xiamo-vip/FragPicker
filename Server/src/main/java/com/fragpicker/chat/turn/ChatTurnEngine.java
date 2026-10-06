@@ -43,7 +43,7 @@ public class ChatTurnEngine {
     public ChatTurnResult stream(CurrentUser user, List<ConversationExchange> history, String rawQuestion,
                                  TurnCancellation cancellation, ChatTurnListener listener) {
         Objects.requireNonNull(cancellation); Objects.requireNonNull(listener);
-        String question = question(rawQuestion); var context = context(history, question);
+        String question = ChatMessageText.normalize(rawQuestion); var context = context(history, question);
         check(cancellation, Long.MAX_VALUE);
         if (!permits.tryAcquire()) throw failure(HttpStatus.TOO_MANY_REQUESTS, "CHAT_BUSY");
         try {
@@ -110,13 +110,6 @@ public class ChatTurnEngine {
         var messages = new ArrayList<ChatMessage>(); messages.add(SystemMessage.from(SYSTEM));
         for (var item : recent) { messages.add(UserMessage.from(item.question())); messages.add(AiMessage.from(item.answer())); }
         messages.add(UserMessage.from(question)); return new Context(messages, recent.size() < history.size());
-    }
-    private String question(String value) {
-        if (value == null || value.length() > 4000) throw failure(HttpStatus.BAD_REQUEST, "INVALID_CHAT_MESSAGE");
-        String normalized = value.strip();
-        if (normalized.isEmpty() || normalized.codePointCount(0, normalized.length()) > 2000 || normalized.codePoints().anyMatch(cp -> cp >= 0xD800 && cp <= 0xDFFF
-                || Character.isISOControl(cp) && cp != '\n' && cp != '\t')) throw failure(HttpStatus.BAD_REQUEST, "INVALID_CHAT_MESSAGE");
-        return normalized;
     }
     private void check(TurnCancellation cancellation, long deadline) {
         if (cancellation.isCancelled() || Thread.currentThread().isInterrupted()) throw failure(HttpStatus.REQUEST_TIMEOUT, "CHAT_CANCELLED");
