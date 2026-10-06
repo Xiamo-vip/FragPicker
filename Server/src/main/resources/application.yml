@@ -33,6 +33,13 @@ management:
 
 fragpicker:
   business-zone: Asia/Shanghai
+  knowledge:
+    enrichment:
+      enabled: ${KNOWLEDGE_ENRICHMENT_ENABLED:false}
+      poll-delay: ${KNOWLEDGE_POLL_DELAY:2s}
+      lease-duration: ${KNOWLEDGE_LEASE_DURATION:5m}
+      max-attempts: ${KNOWLEDGE_MAX_ATTEMPTS:3}
+      retry-base-delay: ${KNOWLEDGE_RETRY_BASE_DELAY:10s}
   ingestion:
     transcription-worker:
       enabled: ${TRANSCRIPTION_WORKER_ENABLED:false}
