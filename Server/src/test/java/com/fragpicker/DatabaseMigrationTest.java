@@ -35,7 +35,7 @@ class DatabaseMigrationTest {
 
     @Test
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("7");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("8");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))
@@ -100,6 +100,13 @@ class DatabaseMigrationTest {
                      var row = statement.executeQuery("SELECT j.stage, j.index_attempt_count, k.summary FROM ingestion_jobs j JOIN fragment_knowledge k ON k.fragment_id = j.fragment_id WHERE j.id = 1")) {
                     assertThat(row.next()).isTrue(); assertThat(row.getString("stage")).isEqualTo("TRANSCRIPTION_PENDING");
                     assertThat(row.getInt("index_attempt_count")).isZero(); assertThat(row.getString("summary")).isEqualTo("原始导数摘要");
+                }
+                assertThat(Flyway.configure().dataSource(url, username, password).target("8").load().migrate().migrationsExecuted).isEqualTo(1);
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
+                    statement.execute("INSERT INTO chat_sessions (user_id, idempotency_key, title, created_at, updated_at) VALUES (1, '00000000-0000-0000-0000-000000000001', '升级后的数学对话', UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))");
+                    try (var row = statement.executeQuery("SELECT k.summary, c.title FROM fragment_knowledge k JOIN chat_sessions c ON c.user_id = k.user_id WHERE k.fragment_id = 1")) {
+                        assertThat(row.next()).isTrue(); assertThat(row.getString("summary")).isEqualTo("原始导数摘要"); assertThat(row.getString("title")).isEqualTo("升级后的数学对话");
+                    }
                 }
             } finally { ddl.execute("DROP DATABASE " + schema); }
         }
