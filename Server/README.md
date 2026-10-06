@@ -421,3 +421,11 @@ V9 增加 `chat_turns` 和 `chat_turn_sources`，保存当前问题、RUNNING/CO
 本模块提供可独立验证的存储业务方法，还没有 HTTP 消息读写或 SSE 接口。上层需要先持久化问题，再调用已验证引擎，最后提交结果；不能提前把流式草稿宣称为完成回答。
 
 2026-10-06 持久化7项真实 MySQL 验证全部通过，包括规范化幂等、并发重放、有效生成互斥、过期恢复与迟到拒绝、仅已完成上下文、账号令牌版本变化、外键级联、来源写入整笔回滚、错误媒体路径、状态 CHECK 的 NULL 边界及快照 ID 一致性。完整后端回归196项，182项通过、14项真实外部调用按开关跳过，构建与打包成功；其中4项迁移验证覆盖空库和 V8→V9 保留旧会话升级。本轮没有新增云调用，不把数据库夹具当作完整 HTTP/云/播放闭环验收。
+
+## 读取持久化消息 API
+
+`GET /api/v1/chat/sessions/{sessionId}/messages/{turnId}` 需要 Bearer 登录，返回 `Cache-Control: no-store`。响应为 turnId、sessionId、question、state、answer、errorCode、createdAt、completedAt、contextTruncated、modelRounds、toolCalls 和经关系外键核对的 cards；时间为 UTC。RUNNING/FAILED 的 answer 为空，不返回草稿；COMPLETED 的最终答案和来源可在重连后恢复。读取发现过期 RUNNING 时将其持久化标为 FAILED/`CHAT_INTERRUPTED`，不会发起模型请求。
+
+编号必须为正的有符号64位整数，非法编号400 `INVALID_CHAT_ID`；其他用户或不存在的会话统一404 `CHAT_SESSION_NOT_FOUND`，本人会话中其他会话的消息或不存在的消息统一404 `CHAT_TURN_NOT_FOUND`。附加 userId 不改变归属，未登录或已注销令牌返回401。响应不包含租约标识、过期时间、令牌版本、幂等键、推理内容或云内部信息。来源里的视频/封面路径需再带登录调用媒体授权接口。
+
+2026-10-06 读取接口4项真实 HTTP/MySQL 验证、问答存储7项和会话创建5项，共16项全部通过，构建与打包成功。覆盖已完成正文及来源时间、处理中与过期恢复、用户/会话双重隔离、输入边界和真实注销后的401；本轮未调用模型或云媒体。发送消息与 SSE 投递仍待下一模块接入。
