@@ -7,7 +7,7 @@
 - Android 在 Android 下实现，使用 Kotlin、Jetpack Compose、Google Material 风格。
 - application.yml 的敏感配置引用环境变量；禁止把真实密钥写入源码或提交。
 - 项目规划与已确认需求位于 docs/PROJECT_PLAN.md。用户已确认要求与未指定的工程参数应区分。
-- 首版个人自用，用户名密码登录，支持 parsevideo 多平台；使用百炼，必须实现语义检索。
+- 首版个人自用，用户名密码登录，支持 parsevideo 多平台；AI 对话使用可配置的 OpenAI 兼容供应商（例如 DeepSeek），不使用百炼聊天；必须实现语义检索，embedding 服务独立配置。
 - 视频和封面长期保存到私有 OSS；北京时间每天 22:00 总结，次日补齐，不推送。
 
 ## 用户要求的 Git 交付规则
