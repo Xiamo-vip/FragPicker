@@ -26,6 +26,8 @@ management:
 
 fragpicker:
   business-zone: Asia/Shanghai
+  ingestion:
+    allowed-hosts: ${INGESTION_ALLOWED_HOSTS:www.acfun.cn,tv.cctv.cn,tv.cctv.com,doupai.cc,v.douyin.com,www.iesdouyin.com,www.douyin.com,haokan.baidu.com,haokan.hao123.com,www.bilibili.com,b23.tv,m.bilibili.com,v.huya.com,v.kuaishou.com,www.pearvideo.com,weibo.cn,meipai.com,h5.pipigx.com,h5.pipix.com,xspshare.baidu.com,kg.qq.com,6.cn,tv.sohu.com,my.tv.sohu.com,weibo.com,isee.weishi.qq.com,v.ixigua.com,www.ixigua.com,xinpianchang.com,share.xiaochuankeji.cn,www.xiaohongshu.com,xhslink.com,xhslink.cn,twitter.com,x.com,t.co,mobile.twitter.com,v.qq.com,m.v.qq.com}
   integrations:
     parsevideo:
       enabled: ${PARSEVIDEO_ENABLED:false}

@@ -90,6 +90,7 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | JWT_SIGNING_KEY | 至少32字节随机密钥的 Base64 值 |
 | JWT_ACCESS_TOKEN_TTL | 访问令牌时长，默认15分钟 |
 | JWT_REFRESH_TOKEN_TTL | 刷新会话绝对有效期，默认30天 |
+| INGESTION_ALLOWED_HOSTS | 逗号分隔的投喂平台域名，与解析服务路由同步 |
 | PARSEVIDEO_ENABLED / PARSEVIDEO_BASE_URL | 启用解析客户端（默认 false）及服务根地址 |
 | PARSEVIDEO_CONNECT_TIMEOUT / PARSEVIDEO_READ_TIMEOUT | 连接与读取超时，默认5秒 / 45秒 |
 | PARSEVIDEO_MAX_RESPONSE_BYTES | 解析响应上限，默认1 MiB |
@@ -133,3 +134,13 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 连接超时允许1～30秒，读取空闲超时允许1～120秒，响应上限允许16 KiB～4 MiB；禁止自动重定向和重试。错误映射为稳定代码和可重试标记，不把供应商内部消息、访问凭据或临时签名媒体地址写入异常与日志。可选 Basic Auth 只允许 HTTPS 或 loopback HTTP。媒体 URL 在此阶段仅解析；后续下载阶段还须校验网络目标和重定向，不能直接信任解析结果。
 
 契约测试使用本机 HTTP 服务；真实部署验证可在运行后端测试前设置 `PARSEVIDEO_TEST_BASE_URL`，使用[解析项目文档](https://github.com/baige778/parse-video-py)的公开 B 站示例完成验证。未设置时明确跳过该真实测试。此模块尚未下载媒体或调用听悟，后续通过持久化投喂任务接入。
+
+## 视频投喂入库
+
+`POST /api/v1/fragments` 使用 Bearer 鉴权，要求 UUID 格式的 `Idempotency-Key` 头；JSON 包含 `shareText`（最多4096字符）和可选 `note`（最多1000字符）。提取分享文本中的一个 HTTP(S) 链接，按解析项目路由校验平台域名，不开放任意 URL。默认域名覆盖解析项目的多平台路由；服务升级时可用 `INGESTION_ALLOWED_HOSTS` 更新完整列表。
+
+成功返回 HTTP 202，包含 `fragmentId`、`jobId`、`status`、`businessDate`、`duplicate`。用户身份来自认证上下文，不接受请求中的用户 ID。UTC 保存时间，业务日期与当时用户时区一并固定保存。
+
+记录、任务、幂等凭证在同一事务入库。同一键与同一规范化链接/备注重试返回已有记录；同一键提交不同内容返回409 `IDEMPOTENCY_CONFLICT`。同一用户重复链接返回已有记录，不新增任务，也不替换原备注和归属日期；其他用户拥有独立记录。规范化只调整协议/主机大小写、默认端口和片段，不删除或重排查询参数，以免破坏分享链接。平台资源 ID 去重在解析阶段继续补充。
+
+当前任务持久化为 `QUEUED`，此接口不调用云服务。异步租约、媒体保存、转写和增强按后续独立模块接入；排队成功不等同于视频已总结完成。真实 MySQL 测试覆盖幂等、并发、用户隔离与任务写入失败时的事务回滚。
