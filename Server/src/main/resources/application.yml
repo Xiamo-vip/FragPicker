@@ -13,6 +13,10 @@ server:
     include-message: never
     include-stacktrace: never
 
+logging:
+  level:
+    com.aliyun.oss: 'OFF'
+
 management:
   endpoints:
     web:
@@ -46,11 +50,16 @@ fragpicker:
     tingwu:
       app-key: ${TINGWU_APP_KEY:}
     oss:
+      enabled: ${OSS_ENABLED:false}
       bucket: ${OSS_BUCKET:}
       endpoint: ${OSS_ENDPOINT:}
+      max-video-bytes: ${OSS_MAX_VIDEO_BYTES:1073741824}
+      max-cover-bytes: ${OSS_MAX_COVER_BYTES:10485760}
+      signed-url-ttl: ${OSS_SIGNED_URL_TTL:5m}
     aliyun:
       access-key-id: ${ALIBABA_CLOUD_ACCESS_KEY_ID:}
       access-key-secret: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET:}
+      security-token: ${ALIBABA_CLOUD_SECURITY_TOKEN:}
     chat:
       enabled: ${AI_CHAT_ENABLED:false}
       base-url: ${AI_CHAT_BASE_URL:https://api.deepseek.com}

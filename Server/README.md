@@ -100,7 +100,11 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | PARSEVIDEO_USERNAME / PARSEVIDEO_PASSWORD | 可选 Basic Auth 凭据，必须成对配置 |
 | TINGWU_APP_KEY | 听悟应用 AppKey |
 | OSS_BUCKET / OSS_ENDPOINT | 私有对象存储 Bucket 与 Endpoint |
+| OSS_ENABLED | 启用 OSS 适配器，默认 false，启动时验证私有 Bucket |
+| OSS_MAX_VIDEO_BYTES / OSS_MAX_COVER_BYTES | 单次上传资源保护上限，默认1 GiB / 10 MiB |
+| OSS_SIGNED_URL_TTL | GET 签名地址有效期，默认5分钟，允许30秒～1小时 |
 | ALIBABA_CLOUD_ACCESS_KEY_ID / ALIBABA_CLOUD_ACCESS_KEY_SECRET | 阿里云访问凭据 |
+| ALIBABA_CLOUD_SECURITY_TOKEN | 可选 STS 临时凭据的安全令牌 |
 | AI_CHAT_ENABLED | 启用聊天模型，默认 false |
 | AI_CHAT_BASE_URL | OpenAI 兼容接口根地址，默认 https://api.deepseek.com |
 | AI_CHAT_API_KEY | 当前聊天供应商的 API Key |
@@ -108,7 +112,7 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | AI_CHAT_TIMEOUT | 调用超时，默认60秒，允许1秒～5分钟 |
 | AI_CHAT_MAX_OUTPUT_TOKENS | 最大输出 token 数，默认4096，允许1～32768 |
 
-听悟和 OSS 目前仍为配置占位符。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
+听悟目前仍为配置占位符；OSS 适配器见下文。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
 
 ## OpenAI 兼容聊天模型
 
@@ -165,3 +169,17 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 领取间隔允许250毫秒～1分钟，租约15秒～10分钟，尝试次数1～10，退避基数1秒～10分钟。启用时租约至少超过连接和读取空闲超时之和5秒；持续输出的 HTTP 响应可能超过空闲超时，最终仍由租约校验拒绝过期结果。配置不满足约束则启动失败。
 
 真实 MySQL 测试覆盖并发单次领取、跳过被锁任务、过期租约隔离、重试上限、永久失败、崩溃恢复和元数据事务回滚；设置 `PARSEVIDEO_TEST_BASE_URL` 还验证真实部署服务到数据库的解析链路。OSS 和听悟链路尚未完成，不应将 `MEDIA_PENDING` 展示为总结成功。
+
+## 私有 OSS 媒体适配器
+
+`OSS_ENABLED=true` 时，必须配置 Bucket、Endpoint 和阿里云访问凭据。支持公网地域 Endpoint（例如 `oss-cn-shenzhen.aliyuncs.com`），自动规范为 HTTPS 并推导 V4 签名地域；不接受任意第三方域名、HTTP、内网 Endpoint 或附加查询。启用后启动时读取 Bucket ACL，必须为私有；不会修改现有 Bucket 权限。SDK 使用 V4 签名和 CRC64 校验，关闭自动重试与 SDK 原始日志。
+
+`OssMediaStorage` 是供后端业务使用的内部适配器，尚不是对外上传/播放接口。调用方必须先验证数据库所有权。上传本机暂存文件，流式计算 SHA-256 与 MD5；对象路径为 `users/{userId}/fragments/{fragmentId}/{video|cover}/{sha256}`，重复上传内容的路径稳定。MD5 随请求提交，检测两次读取之间的内容变化；对象显式设置 private ACL。只接受受限的 MIME 类型、非空普通文件和配置大小上限，这些检查不代替后续下载阶段的媒体内容验证。
+
+上传返回 Bucket、对象键、大小、内容哈希和类型，业务数据库应保存这些稳定信息。按用户、记录及媒体类型校验对象键后，才能生成限时 GET 地址或删除对象；URL 的 `toString` 脱敏，异常只包含稳定错误码和重试标记。签名地址须在播放时重新获取，不长期写入数据库。默认单次上传上限是工程资源边界，不是用户已确认的业务额度。
+
+契约测试通过真实 SDK 请求本机 HTTP 服务，检查 V4 签名、私有 ACL、完整性头、作用域、错误和无自动重试。真实验证需设置 `OSS_TEST_ENABLED=true`、`OSS_BUCKET`、`OSS_ENDPOINT` 及访问凭据，再运行 `mvnw verify`；测试只上传一个极小 PNG 到随机测试命名空间，验证签名下载、匿名访问拒绝和过期拒绝，最后删除本次创建的对象。未启用时该真实测试明确跳过；Bucket 不存在、非私有或凭据权限不足时测试失败，不调整已有设置。
+
+所需权限至少包含 Bucket ACL 查询以及目标对象前缀的 PutObject、GetObject、DeleteObject（删除用于测试清理/将来用户删除）；真实验证不得用模拟替代。此模块尚未从 parsevideo 下载视频、推进媒体任务或提供鉴权播放 API，相关业务按后续独立模块接入。
+
+2026-10-06 开发验证已使用用户配置的深圳测试 Bucket 完成真实上传、重复上传、签名下载、匿名403、过期403与本次对象清理；凭据仅注入测试进程环境，没有写入源码或仓库。真实上传验证使用极小 PNG，不代表大视频、网络目标校验或整条转写链路已完成。
