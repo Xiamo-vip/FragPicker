@@ -25,8 +25,11 @@ $listener.Start()
 $port = $listener.LocalEndpoint.Port
 $listener.Stop()
 $savedEnvironment = @{}
-foreach ($name in @('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD','JWT_SIGNING_KEY',
-        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','AI_CHAT_ENABLED','ANDROID_KNOWLEDGE_FIXTURE','ANDROID_RETRY_FIXTURE','DIGEST_WORKER_ENABLED','DIGEST_SCHEDULE_ENABLED')) {
+$testServiceFlags = @('AI_CHAT_ENABLED','PARSEVIDEO_ENABLED','OSS_ENABLED','TINGWU_ENABLED','INGESTION_WORKER_ENABLED',
+    'MEDIA_WORKER_ENABLED','TRANSCRIPTION_WORKER_ENABLED','MEDIA_CLEANUP_ENABLED','KNOWLEDGE_ENRICHMENT_ENABLED',
+    'KNOWLEDGE_INDEX_ENABLED','DIGEST_WORKER_ENABLED','DIGEST_SCHEDULE_ENABLED')
+foreach ($name in (@('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD','JWT_SIGNING_KEY',
+        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','ANDROID_KNOWLEDGE_FIXTURE','ANDROID_RETRY_FIXTURE') + $testServiceFlags)) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 $testProcess = $null
@@ -58,8 +61,8 @@ try {
     $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     $env:ANDROID_KNOWLEDGE_FIXTURE = if ($AndroidKnowledgeFixture) { 'true' } else { 'false' }
     $env:ANDROID_RETRY_FIXTURE = if ($AndroidRetryFixture) { 'true' } else { 'false' }
-    $env:DIGEST_WORKER_ENABLED = 'false'
-    $env:DIGEST_SCHEDULE_ENABLED = 'false'
+    # Isolated verification uses explicit overrides, including the packaged Android test backend.
+    foreach ($name in $testServiceFlags) { [Environment]::SetEnvironmentVariable($name,'false') }
     Write-Output "Running integration tests on isolated MySQL at localhost:$port. Existing MySQL service is untouched."
     if ($Gradle) {
         & (Join-Path $serverRoot 'gradlew.bat') '-p' $serverRoot 'clean' 'build' '--no-daemon' '--console=plain'

@@ -42,10 +42,10 @@ fragpicker:
     manual:
       cooldown: ${DIGEST_REBUILD_COOLDOWN:60s}
     schedule:
-      enabled: ${DIGEST_SCHEDULE_ENABLED:${DIGEST_WORKER_ENABLED:false}}
+      enabled: ${DIGEST_SCHEDULE_ENABLED:true}
       poll-delay: ${DIGEST_SCHEDULE_POLL_DELAY:10s}
     worker:
-      enabled: ${DIGEST_WORKER_ENABLED:false}
+      enabled: ${DIGEST_WORKER_ENABLED:true}
       poll-delay: ${DIGEST_POLL_DELAY:2s}
       lease-duration: ${DIGEST_LEASE_DURATION:5m}
     generator:
@@ -62,27 +62,27 @@ fragpicker:
       min-similarity: ${SEARCH_MIN_SIMILARITY:0.40}
       literal-boost: ${SEARCH_LITERAL_BOOST:0.10}
     index:
-      enabled: ${KNOWLEDGE_INDEX_ENABLED:false}
+      enabled: ${KNOWLEDGE_INDEX_ENABLED:true}
       poll-delay: ${INDEX_POLL_DELAY:2s}
       lease-duration: ${INDEX_LEASE_DURATION:10m}
       max-attempts: ${INDEX_MAX_ATTEMPTS:3}
       retry-base-delay: ${INDEX_RETRY_BASE_DELAY:10s}
       max-chunks: ${INDEX_MAX_CHUNKS:10000}
     enrichment:
-      enabled: ${KNOWLEDGE_ENRICHMENT_ENABLED:false}
+      enabled: ${KNOWLEDGE_ENRICHMENT_ENABLED:true}
       poll-delay: ${KNOWLEDGE_POLL_DELAY:2s}
       lease-duration: ${KNOWLEDGE_LEASE_DURATION:5m}
       max-attempts: ${KNOWLEDGE_MAX_ATTEMPTS:3}
       retry-base-delay: ${KNOWLEDGE_RETRY_BASE_DELAY:10s}
   ingestion:
     cleanup-worker:
-      enabled: ${MEDIA_CLEANUP_ENABLED:${OSS_ENABLED:false}}
+      enabled: ${MEDIA_CLEANUP_ENABLED:true}
       poll-delay: ${MEDIA_CLEANUP_POLL_DELAY:5s}
       lease-duration: ${MEDIA_CLEANUP_LEASE_DURATION:10m}
       rescan-delay: ${MEDIA_CLEANUP_RESCAN_DELAY:24h}
       retry-base-delay: ${MEDIA_CLEANUP_RETRY_BASE_DELAY:5m}
     transcription-worker:
-      enabled: ${TRANSCRIPTION_WORKER_ENABLED:false}
+      enabled: ${TRANSCRIPTION_WORKER_ENABLED:true}
       poll-delay: ${TRANSCRIPTION_POLL_DELAY:2s}
       query-delay: ${TRANSCRIPTION_QUERY_DELAY:1m}
       lease-duration: ${TRANSCRIPTION_LEASE_DURATION:5m}
@@ -90,13 +90,13 @@ fragpicker:
       max-failures: ${TRANSCRIPTION_MAX_FAILURES:8}
       retry-base-delay: ${TRANSCRIPTION_RETRY_BASE_DELAY:10s}
     media-worker:
-      enabled: ${MEDIA_WORKER_ENABLED:false}
+      enabled: ${MEDIA_WORKER_ENABLED:true}
       poll-delay: ${MEDIA_WORKER_POLL_DELAY:2s}
       lease-duration: ${MEDIA_WORKER_LEASE_DURATION:30m}
       max-attempts: ${MEDIA_WORKER_MAX_ATTEMPTS:3}
       retry-base-delay: ${MEDIA_WORKER_RETRY_BASE_DELAY:10s}
     worker:
-      enabled: ${INGESTION_WORKER_ENABLED:false}
+      enabled: ${INGESTION_WORKER_ENABLED:true}
       poll-delay: ${INGESTION_POLL_DELAY:2s}
       lease-duration: ${INGESTION_LEASE_DURATION:5m}
       max-attempts: ${INGESTION_MAX_ATTEMPTS:3}
@@ -112,7 +112,7 @@ fragpicker:
       total-timeout: ${MEDIA_TOTAL_TIMEOUT:5m}
       max-redirects: ${MEDIA_MAX_REDIRECTS:3}
     parsevideo:
-      enabled: ${PARSEVIDEO_ENABLED:false}
+      enabled: ${PARSEVIDEO_ENABLED:true}
       base-url: ${PARSEVIDEO_BASE_URL:}
       connect-timeout: ${PARSEVIDEO_CONNECT_TIMEOUT:5s}
       read-timeout: ${PARSEVIDEO_READ_TIMEOUT:45s}
@@ -120,7 +120,7 @@ fragpicker:
       username: ${PARSEVIDEO_USERNAME:}
       password: ${PARSEVIDEO_PASSWORD:}
     tingwu:
-      enabled: ${TINGWU_ENABLED:false}
+      enabled: ${TINGWU_ENABLED:true}
       app-key: ${TINGWU_APP_KEY:}
       source-language: ${TINGWU_SOURCE_LANGUAGE:auto}
       connect-timeout: ${TINGWU_CONNECT_TIMEOUT:5s}
@@ -129,7 +129,7 @@ fragpicker:
       max-result-bytes: ${TINGWU_MAX_RESULT_BYTES:16777216}
       source-url-ttl: ${TINGWU_SOURCE_URL_TTL:4h}
     oss:
-      enabled: ${OSS_ENABLED:false}
+      enabled: ${OSS_ENABLED:true}
       bucket: ${OSS_BUCKET:}
       endpoint: ${OSS_ENDPOINT:}
       max-video-bytes: ${OSS_MAX_VIDEO_BYTES:1073741824}
@@ -140,7 +140,7 @@ fragpicker:
       access-key-secret: ${ALIBABA_CLOUD_ACCESS_KEY_SECRET:}
       security-token: ${ALIBABA_CLOUD_SECURITY_TOKEN:}
     chat:
-      enabled: ${AI_CHAT_ENABLED:false}
+      enabled: ${AI_CHAT_ENABLED:true}
       base-url: ${AI_CHAT_BASE_URL:https://api.deepseek.com}
       api-key: ${AI_CHAT_API_KEY:}
       model: ${AI_CHAT_MODEL:}

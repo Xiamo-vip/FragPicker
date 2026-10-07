@@ -10,7 +10,7 @@ function Need([string]$Name) {
 }
 function Enabled([string]$Name) {
     $value = [Environment]::GetEnvironmentVariable($Name)
-    if ([string]::IsNullOrWhiteSpace($value)) { return $false }
+    if ([string]::IsNullOrWhiteSpace($value)) { return $true }
     if ($value -notin @('true','false')) { throw "Expected true or false: $Name" }
     return $value -eq 'true'
 }

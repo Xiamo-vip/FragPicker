@@ -40,7 +40,7 @@ cd Server
 java -jar target/fragpicker-server-0.1.0-SNAPSHOT.jar
 ```
 
-默认 `bootstrap` profile 可以在没有数据库和云凭据的情况下运行，仅供启动检查。实际业务使用 `database` profile；缺少必填数据库环境变量时启动失败，不退回临时数据库。
+默认 `bootstrap` profile 只提供健康检查接口。集成服务现在同样默认开启并要求相应配置；无云启动检查时需显式设置 AI_CHAT_ENABLED、PARSEVIDEO_ENABLED、OSS_ENABLED、TINGWU_ENABLED=false。实际业务使用 `database` profile；缺少必填数据库或服务凭据时启动失败。
 
 ## 本机 MySQL 初始化
 
@@ -117,10 +117,10 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | JWT_ACCESS_TOKEN_TTL | 访问令牌时长，默认15分钟 |
 | JWT_REFRESH_TOKEN_TTL | 刷新会话绝对有效期，默认30天 |
 | INGESTION_ALLOWED_HOSTS | 逗号分隔的投喂平台域名，与解析服务路由同步 |
-| INGESTION_WORKER_ENABLED | 自动解析投喂任务，默认 false，须同时启用 parsevideo |
+| INGESTION_WORKER_ENABLED | 自动解析投喂任务，默认 true，须同时启用 parsevideo |
 | INGESTION_POLL_DELAY / INGESTION_LEASE_DURATION | 领取间隔 / 租约时长，默认2秒 / 5分钟 |
 | INGESTION_MAX_ATTEMPTS / INGESTION_RETRY_BASE_DELAY | 解析尝试上限 / 退避基数，默认3次 / 10秒 |
-| PARSEVIDEO_ENABLED / PARSEVIDEO_BASE_URL | 启用解析客户端（默认 false）及服务根地址 |
+| PARSEVIDEO_ENABLED / PARSEVIDEO_BASE_URL | 启用解析客户端（默认 true）及服务根地址 |
 | PARSEVIDEO_CONNECT_TIMEOUT / PARSEVIDEO_READ_TIMEOUT | 连接与读取超时，默认5秒 / 45秒 |
 | PARSEVIDEO_MAX_RESPONSE_BYTES | 解析响应上限，默认1 MiB |
 | PARSEVIDEO_USERNAME / PARSEVIDEO_PASSWORD | 可选 Basic Auth 凭据，必须成对配置 |
@@ -130,28 +130,34 @@ $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNu
 | MEDIA_MAX_REDIRECTS | 手动检查的重定向上限，默认3，允许0～5 |
 | TINGWU_APP_KEY | 听悟应用 AppKey |
 | OSS_BUCKET / OSS_ENDPOINT | 私有对象存储 Bucket 与 Endpoint |
-| OSS_ENABLED | 启用 OSS 适配器，默认 false，启动时验证私有 Bucket |
+| OSS_ENABLED | 启用 OSS 适配器，默认 true，启动时验证私有 Bucket |
 | OSS_MAX_VIDEO_BYTES / OSS_MAX_COVER_BYTES | 单次上传资源保护上限，默认1 GiB / 10 MiB |
 | OSS_SIGNED_URL_TTL | GET 签名地址有效期，默认5分钟，允许30秒～1小时 |
 | ALIBABA_CLOUD_ACCESS_KEY_ID / ALIBABA_CLOUD_ACCESS_KEY_SECRET | 阿里云访问凭据 |
 | ALIBABA_CLOUD_SECURITY_TOKEN | 可选 STS 临时凭据的安全令牌 |
-| AI_CHAT_ENABLED | 启用聊天模型，默认 false |
+| AI_CHAT_ENABLED | 启用聊天模型，默认 true |
 | AI_CHAT_BASE_URL | OpenAI 兼容接口根地址，默认 https://api.deepseek.com |
 | AI_CHAT_API_KEY | 当前聊天供应商的 API Key |
 | AI_CHAT_MODEL | 聊天模型名，启用时必填，无默认模型 |
 | AI_CHAT_TIMEOUT | 调用超时，默认60秒，允许1秒～5分钟 |
 | AI_CHAT_MAX_OUTPUT_TOKENS | 最大输出 token 数，默认4096，允许1～32768 |
-| MEDIA_WORKER_ENABLED | 启用后台媒体保存任务，默认 false；要求 parsevideo 与 OSS 同时启用 |
+| MEDIA_WORKER_ENABLED | 启用后台媒体保存任务，默认 true；要求 parsevideo 与 OSS 同时启用 |
+| TINGWU_ENABLED / TRANSCRIPTION_WORKER_ENABLED | 听悟客户端 / 后台转写，均默认 true |
+| KNOWLEDGE_ENRICHMENT_ENABLED / KNOWLEDGE_INDEX_ENABLED | 模型增强 / 本地语义索引，均默认 true |
+| DIGEST_WORKER_ENABLED / DIGEST_SCHEDULE_ENABLED | 日总结处理 / 北京时间调度，均默认 true |
+| MEDIA_CLEANUP_ENABLED | 已删除媒体的后台清理，默认 true，要求 OSS_ENABLED |
 | MEDIA_WORKER_POLL_DELAY / MEDIA_WORKER_LEASE_DURATION | 轮询间隔与租约，默认2秒 / 30分钟 |
 | MEDIA_WORKER_MAX_ATTEMPTS / MEDIA_WORKER_RETRY_BASE_DELAY | 媒体阶段独立尝试上限与退避基数，默认3次 / 10秒 |
 
 听悟、OSS 适配器见下文。设置环境变量后重启进程生效。真实凭据、`application-local.yml`、`.env`、构建输出与签名文件均在 Git 忽略列表中。
 
+所有12个服务开关在 application.yml、.env.example 与启动器中默认 true。已有运行环境或 .env 的显式 false 仍优先，应按需要同步更新并重启。普通测试使用 src/test/resources 中的显式停用配置，测试夹具可覆盖开关；这份配置不会打入运行 JAR。生产默认值直接读取主 YAML 进行验证，包含全部开启、逐个显式停用和凭据仍必填；启动器另外5项验证通过。完整真实 MySQL 回归304项，284通过、20项条件测试跳过，无失败，构建与打包成功。
+
 ## OpenAI 兼容聊天模型
 
 聊天使用 LangChain4j 的 `ChatModel` 和 `StreamingChatModel`，默认供应商地址为 DeepSeek。替换 `AI_CHAT_BASE_URL`、`AI_CHAT_API_KEY`、`AI_CHAT_MODEL` 即可切换兼容 Chat Completions 和工具调用的供应商；Base URL 是接口根地址，不应包含 `/chat/completions`。可保留供应商要求的 `/v1` 或其他路径前缀。
 
-设置 `AI_CHAT_ENABLED=true` 后，地址、密钥、模型名和请求边界必须有效，否则启动失败。默认关闭时不要求云凭据，也不创建模型客户端。远程地址要求 HTTPS，本机协议测试允许 loopback HTTP。请求/响应日志关闭，同步请求不自动重试；业务层将明确处理付费调用的重试。DeepSeek 的 `reasoning_content` 在工具轮次之间由 SDK 保留，不作为用户可见回答。
+`AI_CHAT_ENABLED` 默认 true，地址、密钥、模型名和请求边界必须有效，否则启动失败。显式设置 false 可停用客户端；依赖聊天的增强和日总结工作器需要同时停用。远程地址要求 HTTPS，本机协议测试允许 loopback HTTP。请求/响应日志关闭，同步请求不自动重试；业务层将明确处理付费调用的重试。DeepSeek 的 `reasoning_content` 在工具轮次之间由 SDK 保留，不作为用户可见回答。
 
 [DeepSeek 接口文档](https://api-docs.deepseek.com/zh-cn/)提供当前模型名称；模型名通过环境配置，不在代码中固定。embedding 使用 LangChain4j 本地模型的独立模块，不使用聊天 API Key。
 
@@ -273,7 +279,7 @@ MySQL 测试验证阶段原子性、断点恢复、来源刷新、有限重试�
 
 V5 迁移为已有队列增加阶段独立的失败计数，并创建 `fragment_transcriptions`、`fragment_knowledge`、`fragment_sentences`、`fragment_key_points`。所有结果以记录和用户的联合外键隔离，保留原文顺序、说话人、句子 ID 与起止毫秒，以及全文摘要、关键词和重点；不保存输入或结果的签名 URL。删除用户时关联数据按已有外键级联删除，私有 OSS 文件的删除清理需要后续业务单独处理。
 
-启用 `database` profile、`OSS_ENABLED=true`、`TINGWU_ENABLED=true`、`TRANSCRIPTION_WORKER_ENABLED=true` 后自动处理 `TRANSCRIPTION_PENDING`。前两段解析、保存媒体仍分别需要自己的 worker 开关。所有开关默认关闭，避免无凭据启动时产生云调用。
+启用 `database` profile 后，OSS、听悟、转写及前两段解析/媒体工作器默认开启，自动处理各阶段持久任务。需先配置所有服务地址和凭据；已有环境变量或 .env 中显式 false 仍会覆盖默认值。
 
 | 环境变量 | 默认值及作用 |
 | --- | --- |
@@ -647,7 +653,7 @@ DELETE /api/v1/fragments/{id} 需要登录，返回202/no-store：fragmentId、s
 
 ## 已删除媒体的后台清理
 
-MEDIA_CLEANUP_ENABLED 默认跟随 OSS_ENABLED。工作器只领取持久化删除记录，按原 Bucket 和 `users/{userId}/fragments/{fragmentId}/` 前缀扫描，每次最多100个对象；整页对象键验证后才删除，再用下一次独立扫描确认空前缀。启用或暂停版本控制的 Bucket 指定版本 ID 删除历史版本和删除标记，避免普通删除只隐藏对象。[OSS 版本删除说明](https://help.aliyun.com/en/oss/user-guide/manage-objects-in-a-versioning-suspended-bucket)
+MEDIA_CLEANUP_ENABLED 默认 true，要求 OSS_ENABLED=true。工作器只领取持久化删除记录，按原 Bucket 和 `users/{userId}/fragments/{fragmentId}/` 前缀扫描，每次最多100个对象；整页对象键验证后才删除，再用下一次独立扫描确认空前缀。启用或暂停版本控制的 Bucket 指定版本 ID 删除历史版本和删除标记，避免普通删除只隐藏对象。[OSS 版本删除说明](https://help.aliyun.com/en/oss/user-guide/manage-objects-in-a-versioning-suspended-bucket)
 
 默认扫描间隔5秒、租约10分钟、失败退避从5分钟开始，权限错误每日再检查；确认清空后保留删除身份并每日复查。晚到上传检查点会立即唤醒清理，进程在上传后崩溃时由复查覆盖。租约续期和版本栅栏阻止旧工作器提交结果；不会清理其他用户或仍保留内容的前缀。配置见 application.yml 的 cleanup-worker。
 
