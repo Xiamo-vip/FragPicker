@@ -12,9 +12,21 @@ import com.fragpicker.android.core.theme.*
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
 
 class StarfieldBackgroundTest {
     @get:Rule val compose = createComposeRule()
+    @Test fun defaultTextRemainsReadableOnTheDarkCanvas() {
+        compose.setContent { FragmentsPickerTheme(ThemeMode.DARK) {
+            Text("知识", fontSize = 48.sp, modifier = Modifier.testTag("heading"))
+        } }
+        val text = compose.onNodeWithTag("heading").captureToImage().toPixelMap()
+        var bright = 0
+        for (x in 0 until text.width) for (y in 0 until text.height)
+            if (text[x,y].red > .7f && text[x,y].green > .7f && text[x,y].blue > .7f) bright++
+        assertTrue("Dark-theme headings must render in a light foreground", bright > 100)
+    }
     @Test fun darkBackgroundIsSolidWithSparseStarsAndFollowsAppTheme() {
         val mode = mutableStateOf(ThemeMode.DARK)
         compose.setContent { FragmentsPickerTheme(mode.value) {

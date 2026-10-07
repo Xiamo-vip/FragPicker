@@ -5,6 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -69,7 +70,9 @@ fun FragmentsPickerTheme(mode: ThemeMode, content: @Composable () -> Unit) {
     }
     CompositionLocalProvider(LocalDarkTheme provides dark) {
         MaterialTheme(colorScheme = if (dark) DarkColors else LightColors) {
-            Box(Modifier.fillMaxSize().appBackground()) { content() }
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                Box(Modifier.fillMaxSize().appBackground()) { content() }
+            }
         }
     }
 }
