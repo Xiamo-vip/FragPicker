@@ -618,3 +618,13 @@ QUEUED 提前到现在执行并合并请求；RUNNING 最多排队一个新版�
 V13 增加 ingestion_retry_requests，按用户/UUID保存原请求哈希、阶段、工作版本及转写重提交确认，并保留原云任务身份/提交时间用于审计。复合外键保证请求归属，阶段、确认值和版本由数据库约束。fragment_transcriptions 新增可空 requery_at，为后续延长人工查询窗口提供字段；原 task_key、task_id 与 submitted_at 保持不变。当前仅提供结构，人工重试 API 与界面继续独立接入。
 
 2026-10-07 实际 MySQL 升级与约束验证共5项通过，包含空库迁移、逐版升级、原转写任务保留、UUID唯一性、归属与阶段约束、删除级联。构建与打包成功。
+
+## 按阶段人工重试 API
+
+POST /api/v1/fragments/{id}/retry，需要登录、UUID Idempotency-Key 和 JSON `{"replaceTranscription":false}`。仅接受本人的 FAILED 任务，返回202/no-store，包含 fragmentId、当前 status、此请求的 nextStage、jobVersion、duplicate。GET /fragments/{id} 增加 canRetry、retryTarget、retryRequiresNewTranscription，供界面说明恢复阶段。
+
+服务端从已保存检查点决定步骤：增强已完成则重建本地索引；转写已入库则继续增强；已有非终止云任务则查询同一个 task_id；否则补齐解析/媒体再提交转写。TINGWU_TASK_TIMEOUT 是本地等待超时，可人工延长 requery_at，submitted_at 保留原时间。明确云任务失败、无语音结果或不确定提交需要 replaceTranscription=true，可能再次产生费用；原 task_key/task_id/提交时间保存在重试记录后才移除意图。旧响应无法写入新的任务。
+
+每次重试在事务内按用户→任务→投喂→总结变更锁定，增加工作版本、撤销旧租约、重置未完成阶段的有界预算，保留已完成内容。相同用户/UUID/请求可重复确认，阶段已推进也返回原请求身份；变更参数409，其他账号404，非FAILED409；每条内容的新重试请求间隔60秒，重复确认不受限。HTTP 接口不调用外部云或模型服务，工作器按部署开关处理已排队任务。
+
+2026-10-07 新增5项真实 HTTP/MySQL 重试验证、3项状态接口验证、11项 MySQL/模拟云转写工作器回归均通过。涵盖六个恢复阶段、预算保留、查询窗口、旧意图审计、晚响应拒绝、同键并发与限频。可选真实云测试按用户要求跳过；这些验证不代表已完成 OSS/听悟联调。构建与打包成功。

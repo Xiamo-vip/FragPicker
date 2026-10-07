@@ -16,6 +16,6 @@ public interface TranscriptionMapper {
     @Delete("DELETE FROM fragment_transcriptions WHERE fragment_id = #{fragmentId} AND user_id = #{userId} AND task_id IS NULL")
     int deleteRejected(TranscriptionLease lease);
 
-    @Select("SELECT submitted_at <= TIMESTAMPADD(SECOND, -#{seconds}, UTC_TIMESTAMP(3)) FROM fragment_transcriptions WHERE fragment_id = #{lease.fragmentId} AND user_id = #{lease.userId}")
+    @Select("SELECT COALESCE(requery_at, submitted_at) <= TIMESTAMPADD(SECOND, -#{seconds}, UTC_TIMESTAMP(3)) FROM fragment_transcriptions WHERE fragment_id = #{lease.fragmentId} AND user_id = #{lease.userId}")
     Boolean expired(@Param("lease") TranscriptionLease lease, @Param("seconds") long seconds);
 }
