@@ -46,7 +46,15 @@ public class DailyDigestGenerator {
     }
     /** Source iterator must be scoped to READY records and ordered by descending fragment ID. */
     public DigestPiece generate(long owner, LocalDate date, Iterator<DigestSource> sources, BooleanSupplier cancelled, Consumer<DigestPiece> checkpoint) {
-        if (owner < 1 || date == null || date.getYear() < 1000 || date.getYear() > 9999 || sources == null || cancelled == null || checkpoint == null) throw inputInvalid();
+        return generate(owner,date,sources,cancelled,checkpoint,request -> {
+            var model=models.getIfAvailable(); if (model == null) throw failure(HttpStatus.SERVICE_UNAVAILABLE,"DIGEST_DISABLED");
+            return model.chat(request);
+        });
+    }
+    /** Durable callers fence and checkpoint each request through this gateway. */
+    public DigestPiece generate(long owner, LocalDate date, Iterator<DigestSource> sources, BooleanSupplier cancelled,
+            Consumer<DigestPiece> checkpoint, Function<ChatRequest,ChatResponse> gateway) {
+        if (owner < 1 || date == null || date.getYear() < 1000 || date.getYear() > 9999 || sources == null || cancelled == null || checkpoint == null || gateway == null) throw inputInvalid();
         if (!capacity.tryAcquire()) throw failure(HttpStatus.TOO_MANY_REQUESTS, "DIGEST_BUSY");
         try {
             var levels = new ArrayList<List<DigestPiece>>(); Long previous = null;
@@ -58,7 +66,7 @@ public class DailyDigestGenerator {
                     if (previous != null && source.fragmentId() >= previous) throw inputInvalid(); previous = source.fragmentId(); batch.add(source);
                 }
                 if (batch.isEmpty()) break;
-                var piece = leaf(owner, date, batch, cancelled); save(checkpoint, piece); carry(owner, date, levels, piece, cancelled, checkpoint);
+                var piece = leaf(owner, date, batch, cancelled,gateway); save(checkpoint, piece); carry(owner, date, levels, piece, cancelled, checkpoint,gateway);
             }
             var remaining = new ArrayList<DigestPiece>(); for (var level : levels.reversed()) remaining.addAll(level);
             check(cancelled);
@@ -68,7 +76,7 @@ public class DailyDigestGenerator {
                 for (int start = 0; start < remaining.size(); start += FAN_IN) {
                     var group = remaining.subList(start, Math.min(start + FAN_IN, remaining.size()));
                     if (group.size() == 1) next.add(group.getFirst());
-                    else { var piece = merge(owner, date, group, cancelled); save(checkpoint, piece); next.add(piece); }
+                    else { var piece = merge(owner, date, group, cancelled,gateway); save(checkpoint, piece); next.add(piece); }
                 }
                 remaining = next;
             }
@@ -77,15 +85,15 @@ public class DailyDigestGenerator {
         catch (RuntimeException unavailable) { throw failure(HttpStatus.SERVICE_UNAVAILABLE, "DIGEST_SOURCE_UNAVAILABLE"); }
         finally { capacity.release(); }
     }
-    private void carry(long owner, LocalDate date, List<List<DigestPiece>> levels, DigestPiece first, BooleanSupplier cancelled, Consumer<DigestPiece> checkpoint) {
+    private void carry(long owner, LocalDate date, List<List<DigestPiece>> levels, DigestPiece first, BooleanSupplier cancelled, Consumer<DigestPiece> checkpoint, Function<ChatRequest,ChatResponse> gateway) {
         var piece = first; int depth = 0;
         while (true) {
             if (levels.size() == depth) levels.add(new ArrayList<>()); var level = levels.get(depth); level.add(piece);
             if (level.size() < FAN_IN) return;
-            piece = merge(owner, date, level, cancelled); save(checkpoint, piece); level.clear(); depth++;
+            piece = merge(owner, date, level, cancelled,gateway); save(checkpoint, piece); level.clear(); depth++;
         }
     }
-    private DigestPiece leaf(long owner, LocalDate date, List<DigestSource> sources, BooleanSupplier cancelled) {
+    private DigestPiece leaf(long owner, LocalDate date, List<DigestSource> sources, BooleanSupplier cancelled, Function<ChatRequest,ChatResponse> gateway) {
         var ids = new LinkedHashSet<Long>(); var categories = EnumSet.noneOf(Category.class); var documents = new ArrayList<Map<String, Object>>();
         for (var source : sources) {
             ids.add(source.fragmentId()); categories.addAll(source.categories()); var fields = new LinkedHashMap<String, Object>();
@@ -94,26 +102,27 @@ public class DailyDigestGenerator {
             fields.put("keywords", source.keywords().stream().limit(10).map(word -> DigestText.preview(word, 32)).toList());
             fields.put("keywordsTruncated", source.keywords().size() > 10 || source.keywords().stream().limit(10).anyMatch(word -> word.codePointCount(0, word.length()) > 32)); documents.add(fields);
         }
-        return request(owner, date, sources.size(), 1, "SOURCES", documents, ids, categories, cancelled);
+        return request(owner, date, sources.size(), 1, "SOURCES", documents, ids, categories, cancelled,gateway);
     }
-    private DigestPiece merge(long owner, LocalDate date, List<DigestPiece> pieces, BooleanSupplier cancelled) {
+    private DigestPiece merge(long owner, LocalDate date, List<DigestPiece> pieces, BooleanSupplier cancelled, Function<ChatRequest,ChatResponse> gateway) {
         var ids = new LinkedHashSet<Long>(); var categories = EnumSet.noneOf(Category.class); var documents = new ArrayList<Map<String, Object>>(); long count = 0, calls = 1;
         for (var piece : pieces) {
             if (piece.userId() != owner || !piece.date().equals(date) || piece.sourceCount() < 1) throw inputInvalid();
             count = Math.addExact(count, piece.sourceCount()); calls = Math.addExact(calls, piece.modelCalls()); categories.addAll(piece.categories());
             piece.points().forEach(point -> ids.addAll(point.sourceIds())); documents.add(Map.of("summary", piece.summary(), "points", piece.points(), "categories", piece.categories(), "keywords", piece.keywords(), "sourceCount", piece.sourceCount()));
         }
-        return request(owner, date, count, calls, "BATCHES", documents, ids, categories, cancelled);
+        return request(owner, date, count, calls, "BATCHES", documents, ids, categories, cancelled,gateway);
     }
-    private DigestPiece request(long owner, LocalDate date, long count, long calls, String kind, Object documents, Set<Long> ids, Set<Category> categories, BooleanSupplier cancelled) {
+    private DigestPiece request(long owner, LocalDate date, long count, long calls, String kind, Object documents, Set<Long> ids, Set<Category> categories, BooleanSupplier cancelled, Function<ChatRequest,ChatResponse> gateway) {
         String input;
         try { input = json.writeValueAsString(Map.of("date", date.toString(), "kind", kind, "documents", documents, "allowedSourceIds", ids, "allowedCategories", categories)); if (input.length() > 98304) throw inputInvalid(); }
         catch (com.fasterxml.jackson.core.JsonProcessingException invalid) { throw inputInvalid(); }
-        check(cancelled); var model = models.getIfAvailable(); if (model == null) throw failure(HttpStatus.SERVICE_UNAVAILABLE, "DIGEST_DISABLED");
+        check(cancelled);
         ChatResponse response;
-        try { response = model.chat(ChatRequest.builder().messages(SystemMessage.from(INSTRUCTIONS), UserMessage.from(input))
+        try { response = gateway.apply(ChatRequest.builder().messages(SystemMessage.from(INSTRUCTIONS), UserMessage.from(input))
                 .parameters(ChatRequestParameters.builder().maxOutputTokens(properties.maxOutputTokens())
                         .responseFormat(properties.jsonOutput() ? ResponseFormat.JSON : null).build()).build()); }
+        catch (ApiException stable) { throw stable; }
         catch (RuntimeException provider) { throw failure(HttpStatus.SERVICE_UNAVAILABLE, "DIGEST_AI_UNAVAILABLE"); }
         check(cancelled);
         if (response != null && response.finishReason() == FinishReason.LENGTH) throw failure(HttpStatus.SERVICE_UNAVAILABLE, "DIGEST_OUTPUT_LIMIT");
