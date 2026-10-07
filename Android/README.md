@@ -12,6 +12,10 @@ Android SDK 路径通过本机 `ANDROID_HOME` 或忽略的 `local.properties` �
 
 已交付应用壳、主题、真实账号登录与注册页面。投喂和知识页面按独立模块继续接入。应用不包含阿里云、聊天供应商、数据库的凭据，所有云服务由后端调用。
 
+## 设置与外观
+
+主题切换位于设置页，提供浅色、深色、跟随系统三种模式；外观偏好通过 DataStore 保存。登录前也可从右上角设置按钮进入。账号信息和退出入口位于设置页，退出前二次确认。
+
 ## 登录与后端地址
 
 Debug 默认使用 Android 模拟器宿主地址 `http://10.0.2.2:18080`；将本机后端的 `SERVER_PORT` 配置为18080，并启用 `database` profile。也可通过构建参数 `-PAPI_BASE_URL=https://your-backend` 改地址，支持必要的路径前缀。发布构建必须显式配置 HTTPS 地址，否则构建失败。明文 HTTP 仅在 Debug 对模拟器宿主与 loopback 开放，Release 禁止明文流量。

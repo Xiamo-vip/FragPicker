@@ -30,7 +30,9 @@ class LogoutIntegrationTest {
             compose.onNodeWithTag("login_password").performTextInput(password)
             compose.onNodeWithTag("login_submit").performScrollTo().performClick()
             compose.waitUntil(30_000) { compose.onAllNodesWithText("欢迎回来，$username").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithContentDescription("设置").performClick()
             compose.onNodeWithText("退出登录").performScrollTo().performClick()
+            compose.onNodeWithText("确认退出").performClick()
             compose.waitUntil(30_000) { compose.onAllNodes(hasTestTag("login_username") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
             assertNull(SessionVault(context).consume())
             val error = assertThrows(AuthApiFailure::class.java) { runBlocking { api.currentUser(otherDevice.accessToken) } }

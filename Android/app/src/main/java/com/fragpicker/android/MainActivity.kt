@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +26,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.fragpicker.android.core.theme.*
 import com.fragpicker.android.core.auth.*
 import com.fragpicker.android.feature.auth.*
+import com.fragpicker.android.feature.settings.SettingsScreen
 
 class MainActivity : ComponentActivity() {
     private val theme: ThemeViewModel by viewModels {
@@ -46,15 +49,25 @@ class MainActivity : ComponentActivity() {
             val registrationState by registration.state.collectAsStateWithLifecycle()
             var showRegistration by rememberSaveable { mutableStateOf(false) }
             var registeredUsername by rememberSaveable { mutableStateOf("") }
-            BackHandler(enabled = showRegistration) { showRegistration = false }
+            var showSettings by rememberSaveable { mutableStateOf(false) }
+            BackHandler(enabled = showRegistration || showSettings) { showRegistration = false; showSettings = false }
             FragmentsPickerTheme(mode) {
+                if (showSettings) {
+                    SettingsScreen(mode, theme::setMode, account, onLogout = {
+                        registeredUsername = ""; showRegistration = false; showSettings = false; login.logout()
+                    }, onBack = { showSettings = false })
+                } else {
                 Scaffold { padding ->
                     Column(
                         Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState())
                             .padding(horizontal = 28.dp, vertical = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
-                        Text("FragmentsPicker", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text("FragmentsPicker", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            IconButton(onClick = { showSettings = true }) { Icon(Icons.Rounded.Settings, "设置") }
+                        }
                         val user = account.user
                         if (user == null) {
                             if (showRegistration) {
@@ -75,25 +88,11 @@ class MainActivity : ComponentActivity() {
                                     Text("每日回顾时区：${user.businessZone}", style = MaterialTheme.typography.bodyMedium)
                                 }
                             }
-                            account.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                            Text("退出登录将撤销此账号在所有设备上的会话。", style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            OutlinedButton(onClick = {
-                                registeredUsername = ""; showRegistration = false; login.logout()
-                            }, enabled = !account.loading, modifier = Modifier.fillMaxWidth()) {
-                                Text(if (account.loading) "正在退出…" else "退出登录")
-                            }
-                        }
-                        HorizontalDivider()
-                        Text("外观", style = MaterialTheme.typography.titleMedium)
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            ThemeMode.entries.forEach { option ->
-                                FilterChip(selected = option == mode, onClick = { theme.setMode(option) }, label = { Text(option.label) })
-                            }
                         }
                         Text("慢一点，记住多一点。", style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Start))
                     }
+                }
                 }
             }
         }
