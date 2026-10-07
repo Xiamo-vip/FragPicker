@@ -34,7 +34,7 @@ fun DetailRoute(api: JsonApi, id: Long, onBack: () -> Unit) {
     var seekMs by rememberSaveable(id) { mutableLongStateOf(0) }
     var seekVersion by rememberSaveable(id) { mutableIntStateOf(0) }
     val uriHandler = LocalUriHandler.current
-    Scaffold(topBar = { TopAppBar(title = { Text("内容详情") }, navigationIcon = {
+    Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, topBar = { TopAppBar(title = { Text("内容详情") }, navigationIcon = {
         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
     }, actions = { IconButton(onClick = model::refresh, enabled = !state.loading) { Icon(Icons.Rounded.Refresh, "刷新内容") } }) }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("detail_page"), contentPadding = PaddingValues(20.dp),

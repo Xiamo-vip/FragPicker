@@ -20,10 +20,10 @@ import com.fragpicker.android.feature.auth.LoginUiState
 fun SettingsScreen(mode: ThemeMode, onMode: (ThemeMode) -> Unit, account: LoginUiState,
                    onLogout: () -> Unit, onBack: (() -> Unit)? = null) {
     var confirmLogout by remember { mutableStateOf(false) }
-    Scaffold(topBar = {
+    Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, topBar = {
         TopAppBar(title = { Text("设置") }, navigationIcon = {
             onBack?.let { IconButton(onClick = it) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") } }
-        })
+        }, colors = TopAppBarDefaults.topAppBarColors(containerColor = androidx.compose.ui.graphics.Color.Transparent))
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {

@@ -2,11 +2,15 @@ package com.fragpicker.android.core.theme
 
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -63,5 +67,9 @@ fun FragmentsPickerTheme(mode: ThemeMode, content: @Composable () -> Unit) {
             }
         }
     }
-    MaterialTheme(colorScheme = if (dark) DarkColors else LightColors, content = content)
+    CompositionLocalProvider(LocalDarkTheme provides dark) {
+        MaterialTheme(colorScheme = if (dark) DarkColors else LightColors) {
+            Box(Modifier.fillMaxSize().appBackground()) { content() }
+        }
+    }
 }

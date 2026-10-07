@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -19,7 +18,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -32,6 +30,7 @@ import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.fragpicker.android.core.auth.UserProfile
+import com.fragpicker.android.core.theme.appBackground
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -62,7 +61,6 @@ fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
     val owner = remember(store) { object : ViewModelStoreOwner { override val viewModelStore = store } }
     DisposableEffect(store) { onDispose { store.clear() } }
     val backdrop = rememberLayerBackdrop()
-    val colors = MaterialTheme.colorScheme
     BackHandler(enabled = detailId != null || destination != Destination.FEED) {
         if (detailId != null) detailId = null else destination = Destination.FEED
     }
@@ -72,8 +70,7 @@ fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
             detail(detailId!!) { detailId = null }
         } else {
         Box(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize().layerBackdrop(backdrop).background(
-                Brush.verticalGradient(listOf(colors.surface, colors.primaryContainer.copy(alpha = .5f), colors.surface)))) {
+            Box(Modifier.fillMaxSize().layerBackdrop(backdrop).appBackground()) {
                 Crossfade(destination, label = "page") { page ->
                     holder.SaveableStateProvider(page.name) {
                         when (page) {

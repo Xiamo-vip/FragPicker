@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
                         registeredUsername = ""; showRegistration = false; showSettings = false; login.logout()
                     }, onBack = { showSettings = false })
                 } else {
-                Scaffold { padding ->
+                Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent) { padding ->
                     Column(
                         Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState())
                             .padding(horizontal = 28.dp, vertical = 24.dp),
