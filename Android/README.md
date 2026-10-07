@@ -10,7 +10,11 @@ Kotlin + Jetpack Compose + Material 3；最低 Android 8.0（API 26），编译�
 
 Android SDK 路径通过本机 `ANDROID_HOME` 或忽略的 `local.properties` 提供。APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。在已连接的模拟器上执行 `:app:connectedDebugAndroidTest`，验证启动、主题切换和重建后偏好保留。
 
-已交付应用壳、主题、账号登录与注册、投喂、内容详情、历史回顾及 AI 对话页面。分享入口、每日 AI 总结等继续按独立模块交付。应用不包含阿里云、聊天供应商、数据库的凭据，所有云服务由后端调用。
+已交付应用壳、主题、账号登录与注册、投喂和系统分享、内容详情、历史回顾及 AI 对话页面。每日 AI 总结等继续按独立模块交付。应用不包含阿里云、聊天供应商、数据库的凭据，所有云服务由后端调用。
+
+## 系统分享入口
+
+Android 分享面板可选择 FragmentsPicker，接收 `ACTION_SEND` 的 `text/plain` 内容，冷启动和已打开应用均可处理。登录前收到的文本通过 SavedStateHandle 保留；登录后进入投喂草稿，支持编辑，按“收进知识空间”才会提交。已有草稿时提供替换/保留选择，替换会清空旧备注；已消费分享不因页面重建再次导入。账号退出清除待接收分享。真实后端设备测试验证分享目标注册、登录前重建、自动进入投喂、草稿替换以及确认前数据库不增加记录。
 
 ## AI 对话页面
 

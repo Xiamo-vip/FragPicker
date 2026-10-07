@@ -49,12 +49,14 @@ val LocalNavigationInset = staticCompositionLocalOf { 0.dp }
 
 @Composable
 fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
+             openFeedRequest: String? = null,
              detail: (@Composable (Long, () -> Unit) -> Unit)? = null,
              feed: @Composable () -> Unit = { Overview("投喂", "欢迎回来，${user.username}", "让值得记住的内容，在这里沉淀。") },
              history: @Composable () -> Unit = { Overview("回顾", "翻阅你的知识日历", "按日期找回曾经收藏的灵感。") },
              chat: @Composable () -> Unit = { Overview("对话", "和记忆聊一聊", "描述你要找的内容，连接零散的知识。") }) {
     var destination by rememberSaveable { mutableStateOf(Destination.FEED) }
     var detailId by rememberSaveable { mutableStateOf<Long?>(null) }
+    LaunchedEffect(openFeedRequest) { if (openFeedRequest != null) { detailId = null; destination = Destination.FEED } }
     val holder = rememberSaveableStateHolder()
     val store = remember(user.id) { ViewModelStore() }
     val owner = remember(store) { object : ViewModelStoreOwner { override val viewModelStore = store } }

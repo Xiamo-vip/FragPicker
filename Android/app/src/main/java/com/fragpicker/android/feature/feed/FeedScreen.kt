@@ -31,7 +31,8 @@ import kotlinx.coroutines.awaitCancellation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeedRoute(api: JsonApi, user: UserProfile, onOpen: ((Long) -> Unit)? = null) {
+fun FeedRoute(api: JsonApi, user: UserProfile, onOpen: ((Long) -> Unit)? = null,
+    incomingId: String? = null, incomingText: String? = null, onImported: (String) -> Unit = {}) {
     val context = LocalContext.current.applicationContext
     val model: FeedViewModel = viewModel(factory = viewModelFactory { initializer {
         FeedViewModel(api, context.getSharedPreferences("feed_last", Context.MODE_PRIVATE))
@@ -44,6 +45,18 @@ fun FeedRoute(api: JsonApi, user: UserProfile, onOpen: ((Long) -> Unit)? = null)
     DisposableEffect(model) { onDispose { model.pause() } }
     var share by rememberSaveable { mutableStateOf("") }
     var note by rememberSaveable { mutableStateOf("") }
+    var replaceDraft by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(incomingId, state.sending) {
+        if (incomingId != null && incomingText != null && !state.sending) {
+            if (share.isBlank() || share == incomingText) { share = incomingText; onImported(incomingId) }
+            else replaceDraft = true
+        }
+    }
+    if (replaceDraft && incomingId != null && incomingText != null) AlertDialog(
+        onDismissRequest = { replaceDraft = false; onImported(incomingId) }, title = { Text("收到新的视频分享") },
+        text = { Text("当前已有投喂草稿，可以替换链接与备注，或保留当前草稿。") },
+        confirmButton = { TextButton(onClick = { share = incomingText; note = ""; replaceDraft = false; onImported(incomingId) }) { Text("替换草稿") } },
+        dismissButton = { TextButton(onClick = { replaceDraft = false; onImported(incomingId) }) { Text("保留草稿") } })
     val keyboard = LocalSoftwareKeyboardController.current
     Scaffold(containerColor = Color.Transparent, topBar = { TopAppBar(title = { Text("投喂") },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)) }) { padding ->
