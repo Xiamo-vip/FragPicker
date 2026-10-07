@@ -6,6 +6,8 @@ import java.util.List;
 
 @Mapper
 public interface DigestChangeMapper {
+    @Select("SELECT COUNT(*) FROM fragments WHERE user_id=#{owner} AND business_date=#{date}")
+    long dayTotal(@Param("owner") long owner,@Param("date") LocalDate date);
     @Select("SELECT id FROM users WHERE id=#{owner} FOR UPDATE") Long lockOwner(long owner);
     @Select("SELECT business_date FROM fragments WHERE id=#{fragment} AND user_id=#{owner}")
     LocalDate fragmentDate(@Param("owner") long owner,@Param("fragment") long fragment);

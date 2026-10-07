@@ -35,7 +35,7 @@ public class DigestScheduleStore {
         // Existing digest before the change row: no change->digest edge while a worker snapshots fragments.
         var job=jobs.lockDay(owner,date); var change=changes.lock(owner,date);
         if (change==null || change.version()<=change.scheduledVersion() || change.dueAt().isAfter(LocalDateTime.ofInstant(clock.instant(),ZoneOffset.UTC))) return false;
-        if (job==null) jobs.insert(owner,date,change.dueAt());
+        if (job==null) { if (changes.dayTotal(owner,date)>0) jobs.insert(owner,date,change.dueAt()); }
         else if ("READY".equals(job.status()) || ("RUNNING".equals(job.status()) && job.requestedRevision()==job.workingRevision()))
             jobs.queueRevision(job.id(),change.dueAt());
         // QUEUED already incorporates changes in its next snapshot; FAILED requires explicit manual rebuild.
