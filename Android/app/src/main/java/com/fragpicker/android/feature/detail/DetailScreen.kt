@@ -46,6 +46,7 @@ fun DetailRoute(api: JsonApi, id: Long, onBack: () -> Unit) {
                     Text("${content.optionalString("author") ?: content.optString("sourceHost")} · ${content.optString("businessDate")}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (content.optString("status") != "READY") Text("处理状态：${content.optString("status")}", style = MaterialTheme.typography.labelLarge)
                 }
+                item { com.fragpicker.android.feature.retry.RetryPanel(api, id, model::refresh, content.optString("status")) }
                 item {
                     state.videoUrl?.let { VideoPlayer(it, seekMs, seekVersion, model::play, state.videoRevision) } ?: Column {
                         SignedCover(api, id, content.optionalString("coverMediaPath") != null, Modifier.fillMaxWidth().aspectRatio(16f / 9f))

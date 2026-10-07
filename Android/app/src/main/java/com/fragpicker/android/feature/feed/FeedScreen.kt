@@ -96,6 +96,7 @@ fun FeedRoute(api: JsonApi, user: UserProfile, onOpen: ((Long) -> Unit)? = null,
                     modifier = Modifier.testTag("feed_result"),
                     actionLabel = if (onOpen != null) "查看内容" else null, action = onOpen?.let { { it(id) } })
                 TextButton(onClick = model::retryStatus) { Text("刷新处理状态") }
+                com.fragpicker.android.feature.retry.RetryPanel(api, id, model::retryStatus, state.status)
                 if (visual == ProcessingVisual.WAITING && onOpen != null) TextButton(onClick = { onOpen(id) }) { Text("查看内容") }
             }
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("feed_error")) }

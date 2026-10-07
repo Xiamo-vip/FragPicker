@@ -1,11 +1,12 @@
 param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0, [switch]$Gradle, [switch]$AndroidChatLive, [switch]$AndroidKnowledgeFixture, [switch]$AndroidDigestLive,
-    [string]$AndroidGradleInitScript, [string]$AndroidTestClass)
+    [string]$AndroidGradleInitScript, [string]$AndroidTestClass, [switch]$AndroidRetryFixture)
 
 $ErrorActionPreference = 'Stop'
 if ($AndroidChatLive -and (-not $AndroidAuth -or [string]::IsNullOrWhiteSpace($env:AI_CHAT_API_KEY))) {
     throw 'AndroidChatLive requires AndroidAuth and AI_CHAT_API_KEY in the process environment'
 }
 if ($AndroidKnowledgeFixture -and -not $AndroidAuth) { throw 'AndroidKnowledgeFixture requires AndroidAuth' }
+if ($AndroidRetryFixture -and -not $AndroidAuth) { throw 'AndroidRetryFixture requires AndroidAuth' }
 if ($AndroidDigestLive -and (-not $AndroidChatLive -or -not $AndroidKnowledgeFixture)) { throw 'AndroidDigestLive requires AndroidChatLive and AndroidKnowledgeFixture' }
 if (-not $MySqlBin) {
     $MySqlBin = Split-Path (Get-Command mysqld.exe -ErrorAction Stop).Source
@@ -25,7 +26,7 @@ $port = $listener.LocalEndpoint.Port
 $listener.Stop()
 $savedEnvironment = @{}
 foreach ($name in @('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD','JWT_SIGNING_KEY',
-        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','AI_CHAT_ENABLED','ANDROID_KNOWLEDGE_FIXTURE','DIGEST_WORKER_ENABLED','DIGEST_SCHEDULE_ENABLED')) {
+        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','AI_CHAT_ENABLED','ANDROID_KNOWLEDGE_FIXTURE','ANDROID_RETRY_FIXTURE','DIGEST_WORKER_ENABLED','DIGEST_SCHEDULE_ENABLED')) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 $testProcess = $null
@@ -56,6 +57,7 @@ try {
     $env:DB_TEST_PASSWORD = $testPassword
     $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     $env:ANDROID_KNOWLEDGE_FIXTURE = if ($AndroidKnowledgeFixture) { 'true' } else { 'false' }
+    $env:ANDROID_RETRY_FIXTURE = if ($AndroidRetryFixture) { 'true' } else { 'false' }
     $env:DIGEST_WORKER_ENABLED = 'false'
     $env:DIGEST_SCHEDULE_ENABLED = 'false'
     Write-Output "Running integration tests on isolated MySQL at localhost:$port. Existing MySQL service is untouched."
@@ -101,6 +103,7 @@ try {
         if ($AndroidTestClass) { $androidArguments += "-Pandroid.testInstrumentationRunnerArguments.class=$AndroidTestClass" }
         if ($AndroidChatLive) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.chatLive=true' }
         if ($AndroidKnowledgeFixture) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.knowledgeFixture=true' }
+        if ($AndroidRetryFixture) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.retryFixture=true' }
         if ($AndroidDigestLive) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.digestLive=true' }
         & (Join-Path $workspaceRoot 'Android/gradlew.bat') @androidArguments
         if ($LASTEXITCODE -ne 0) { throw 'Android authentication verification failed' }
