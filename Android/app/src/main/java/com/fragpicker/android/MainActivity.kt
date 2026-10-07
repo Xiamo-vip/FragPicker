@@ -68,7 +68,8 @@ class MainActivity : ComponentActivity() {
                 if (account.user != null) {
                     AppShell(account.user!!,
                         openFeedRequest = incomingShare?.getString("id"),
-                        detail = { id, back -> DetailRoute(JsonApi(authRepository, account.user!!.id), id, back) },
+                        detail = { id, back -> DetailRoute(JsonApi(authRepository, account.user!!.id), id, back,
+                            com.fragpicker.android.core.ui.LocalFragmentDeleted.current) },
                         history = { HistoryRoute(JsonApi(authRepository, account.user!!.id), LocalOpenFragment.current) },
                         chat = { ChatRoute(JsonApi(authRepository, account.user!!.id), LocalOpenFragment.current) },
                         feed = { FeedRoute(JsonApi(authRepository, account.user!!.id), account.user!!, LocalOpenFragment.current,

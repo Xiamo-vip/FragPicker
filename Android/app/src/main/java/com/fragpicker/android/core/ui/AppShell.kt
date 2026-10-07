@@ -39,6 +39,7 @@ enum class Destination(val label: String, val icon: ImageVector) {
 }
 
 val LocalOpenFragment = staticCompositionLocalOf<(Long) -> Unit> { {} }
+val LocalFragmentDeleted = staticCompositionLocalOf<() -> Unit> { {} }
 val LocalNavigationInset = staticCompositionLocalOf { 0.dp }
 
 @Composable
@@ -60,6 +61,7 @@ fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
         if (detailId != null) detailId = null else destination = Destination.FEED
     }
     CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalOpenFragment provides { detailId = it },
+        LocalFragmentDeleted provides { detailId = null; destination = Destination.HISTORY },
         LocalNavigationInset provides if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) 100.dp else 0.dp) {
         if (detailId != null && detail != null) {
             detail(detailId!!) { detailId = null }

@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fragpicker.android.core.network.*
+import com.fragpicker.android.core.auth.AuthApiFailure
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import org.json.JSONObject
@@ -47,6 +48,9 @@ class FeedViewModel(private val api: JsonApi, private val preferences: SharedPre
 
     fun resume() {
         observing = true
+        if (!state.value.sending && state.value.id != null && preferences.getLong(preferenceKey, 0) != state.value.id) {
+            polling?.cancel(); polling = null; mutable.value = FeedState()
+        }
         startPolling()
     }
     private fun startPolling() {
@@ -70,6 +74,11 @@ class FeedViewModel(private val api: JsonApi, private val preferences: SharedPre
                 error = if (result.getString("status") == "FAILED") "处理未完成，错误类别：${result.optString("errorCode", "UNKNOWN")}" else null)
             true
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (failure: Exception) { mutable.value = state.value.copy(error = failureMessage(failure)); false }
+        catch (failure: Exception) {
+            if (failure is AuthApiFailure && failure.status == 404) {
+                preferences.edit().remove(preferenceKey).apply(); mutable.value = FeedState()
+            } else mutable.value = state.value.copy(error = failureMessage(failure))
+            false
+        }
     }
 }

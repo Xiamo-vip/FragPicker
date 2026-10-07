@@ -25,7 +25,7 @@ import com.fragpicker.android.core.ui.SignedCover
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun DetailRoute(api: JsonApi, id: Long, onBack: () -> Unit) {
+fun DetailRoute(api: JsonApi, id: Long, onBack: () -> Unit, onDeleted: () -> Unit = onBack) {
     val store = remember(id, api.userId) { ViewModelStore() }
     val owner = remember(store) { object : ViewModelStoreOwner { override val viewModelStore = store } }
     DisposableEffect(store) { onDispose { store.clear() } }
@@ -36,7 +36,10 @@ fun DetailRoute(api: JsonApi, id: Long, onBack: () -> Unit) {
     val uriHandler = LocalUriHandler.current
     Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, topBar = { TopAppBar(title = { Text("内容详情") }, navigationIcon = {
         IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
-    }, actions = { IconButton(onClick = model::refresh, enabled = !state.loading) { Icon(Icons.Rounded.Refresh, "刷新内容") } }) }) { padding ->
+    }, actions = {
+        com.fragpicker.android.feature.deletion.DeletionAction(api, id, onDeleted)
+        IconButton(onClick = model::refresh, enabled = !state.loading) { Icon(Icons.Rounded.Refresh, "刷新内容") }
+    }) }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("detail_page"), contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
