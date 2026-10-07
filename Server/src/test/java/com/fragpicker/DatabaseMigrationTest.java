@@ -38,7 +38,7 @@ class DatabaseMigrationTest {
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
         assertThat(dataSource.getMaximumPoolSize()).isEqualTo(4);
         assertThat(dataSource.getMinimumIdle()).isZero();
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("10");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("11");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))
@@ -121,6 +121,11 @@ class DatabaseMigrationTest {
                 try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
                     try (var row = statement.executeQuery("SELECT question, answer, state FROM chat_turns WHERE user_id = 1")) { assertThat(row.next()).isTrue(); assertThat(row.getString("question")).isEqualTo("旧问题"); assertThat(row.getString("answer")).isEqualTo("旧答案"); assertThat(row.getString("state")).isEqualTo("COMPLETED"); }
                     try (var row = statement.executeQuery("SELECT GROUP_CONCAT(column_name ORDER BY seq_in_index) AS columns_list FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'chat_turns' AND index_name = 'idx_chat_turn_session_page'")) { assertThat(row.next()).isTrue(); assertThat(row.getString("columns_list")).isEqualTo("session_id,user_id,id"); }
+                }
+                assertThat(Flyway.configure().dataSource(url, username, password).target("11").load().migrate().migrationsExecuted).isEqualTo(1);
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
+                    try (var row = statement.executeQuery("SELECT question, answer FROM chat_turns WHERE user_id = 1")) { assertThat(row.next()).isTrue(); assertThat(row.getString("question")).isEqualTo("旧问题"); assertThat(row.getString("answer")).isEqualTo("旧答案"); }
+                    try (var row = statement.executeQuery("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('daily_digests','daily_digest_sources','daily_digest_checkpoints','daily_digest_requests')")) { assertThat(row.next()).isTrue(); assertThat(row.getInt(1)).isEqualTo(4); }
                 }
             } finally { ddl.execute("DROP DATABASE " + schema); }
         }
