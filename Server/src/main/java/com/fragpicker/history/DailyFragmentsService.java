@@ -28,6 +28,7 @@ public class DailyFragmentsService {
         var items = visible.stream().map(id -> item(content.get(owner, id))).toList();
         return new DailyFragmentsResponse(date, items, ids.size() > limit ? visible.getLast() : null);
     }
+    public DailyFragmentsResponse.Item card(long owner,long id) { return item(content.get(owner,id)); }
     private DailyFragmentsResponse.Item item(ContentResponse saved) {
         var knowledge = saved.knowledge(); String summary = null, origin = "NONE"; boolean truncated = false;
         if (knowledge != null) {
