@@ -27,6 +27,7 @@ import com.fragpicker.android.core.theme.*
 import com.fragpicker.android.core.auth.*
 import com.fragpicker.android.feature.auth.*
 import com.fragpicker.android.feature.settings.SettingsScreen
+import com.fragpicker.android.core.ui.AppShell
 
 class MainActivity : ComponentActivity() {
     private val theme: ThemeViewModel by viewModels {
@@ -52,7 +53,13 @@ class MainActivity : ComponentActivity() {
             var showSettings by rememberSaveable { mutableStateOf(false) }
             BackHandler(enabled = showRegistration || showSettings) { showRegistration = false; showSettings = false }
             FragmentsPickerTheme(mode) {
-                if (showSettings) {
+                if (account.user != null) {
+                    AppShell(account.user!!, settings = {
+                        SettingsScreen(mode, theme::setMode, account, onLogout = {
+                            registeredUsername = ""; showRegistration = false; showSettings = false; login.logout()
+                        })
+                    })
+                } else if (showSettings) {
                     SettingsScreen(mode, theme::setMode, account, onLogout = {
                         registeredUsername = ""; showRegistration = false; showSettings = false; login.logout()
                     }, onBack = { showSettings = false })
@@ -68,8 +75,6 @@ class MainActivity : ComponentActivity() {
                             Text("FragmentsPicker", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             IconButton(onClick = { showSettings = true }) { Icon(Icons.Rounded.Settings, "设置") }
                         }
-                        val user = account.user
-                        if (user == null) {
                             if (showRegistration) {
                                 RegistrationScreen(registrationState, registration::register,
                                     onBack = { showRegistration = false }, onCreated = {
@@ -80,15 +85,6 @@ class MainActivity : ComponentActivity() {
                                     registration.reset(); showRegistration = true
                                 }, initialUsername = registeredUsername)
                             }
-                        } else {
-                            Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer) {
-                                Column(Modifier.fillMaxWidth().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    Text("欢迎回来，${user.username}", style = MaterialTheme.typography.headlineSmall)
-                                    Text("已登录你的个人知识空间", style = MaterialTheme.typography.bodyLarge)
-                                    Text("每日回顾时区：${user.businessZone}", style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-                        }
                         Text("慢一点，记住多一点。", style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.Start))
                     }

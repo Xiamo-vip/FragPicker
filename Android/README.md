@@ -14,6 +14,8 @@ Android SDK 路径通过本机 `ANDROID_HOME` 或忽略的 `local.properties` �
 
 ## 设置与外观
 
+已登录后使用悬浮液态玻璃导航进入投喂、回顾、对话、设置。导航采用 [AndroidLiquidGlass / Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) 1.0.0 的背景捕获、模糊和透镜折射，配合弹簧移动胶囊与 Material 图标。固定版本与当前 Kotlin 2.2.21 / Compose 1.9.4 兼容；Android 12 以下无实时模糊，Android 13 以下无透镜折射，保持可读的主题表面与完整导航功能。输入键盘打开时隐藏底部导航，退出账号时清理业务 ViewModel。导航测试覆盖四个标签、设置入口和手动深色主题。
+
 主题切换位于设置页，提供浅色、深色、跟随系统三种模式；外观偏好通过 DataStore 保存。登录前也可从右上角设置按钮进入。账号信息和退出入口位于设置页，退出前二次确认。
 
 ## 登录与后端地址
