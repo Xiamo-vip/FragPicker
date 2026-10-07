@@ -38,7 +38,7 @@ class DatabaseMigrationTest {
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
         assertThat(dataSource.getMaximumPoolSize()).isEqualTo(4);
         assertThat(dataSource.getMinimumIdle()).isZero();
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("12");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("13");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))
@@ -137,6 +137,15 @@ class DatabaseMigrationTest {
                     assertThat(rows.next()).isTrue(); assertThat(rows.getString("due_at")).startsWith("2026-10-06 14:00:00");
                     assertThat(rows.getLong("version")).isEqualTo(1); assertThat(rows.getLong("scheduled_version")).isZero();
                     assertThat(rows.next()).isTrue(); assertThat(rows.getString("due_at")).startsWith("2026-10-07 16:15:00"); assertThat(rows.next()).isFalse();
+                }
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
+                    statement.execute("INSERT INTO fragment_transcriptions(fragment_id,user_id,task_key,task_id,submitted_at) VALUES (1,1,'upgrade-key','upgrade-task','2026-10-06 10:00:00')");
+                }
+                assertThat(Flyway.configure().dataSource(url, username, password).target("13").load().migrate().migrationsExecuted).isEqualTo(1);
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement();
+                     var rows = statement.executeQuery("SELECT task_key,task_id,submitted_at,requery_at FROM fragment_transcriptions WHERE fragment_id=1")) {
+                    assertThat(rows.next()).isTrue(); assertThat(rows.getString("task_id")).isEqualTo("upgrade-task"); assertThat(rows.getString("task_key")).isEqualTo("upgrade-key");
+                    assertThat(rows.getString("submitted_at")).startsWith("2026-10-06 10:00:00"); assertThat(rows.getTimestamp("requery_at")).isNull();
                 }
             } finally { ddl.execute("DROP DATABASE " + schema); }
         }
