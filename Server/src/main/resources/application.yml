@@ -39,6 +39,8 @@ management:
 fragpicker:
   business-zone: Asia/Shanghai
   digest:
+    manual:
+      cooldown: ${DIGEST_REBUILD_COOLDOWN:60s}
     schedule:
       enabled: ${DIGEST_SCHEDULE_ENABLED:${DIGEST_WORKER_ENABLED:false}}
       poll-delay: ${DIGEST_SCHEDULE_POLL_DELAY:10s}
