@@ -33,6 +33,7 @@ import com.fragpicker.android.feature.feed.FeedRoute
 import com.fragpicker.android.feature.detail.DetailRoute
 import com.fragpicker.android.core.ui.LocalOpenFragment
 import com.fragpicker.android.feature.history.HistoryRoute
+import com.fragpicker.android.feature.chat.ChatRoute
 
 class MainActivity : ComponentActivity() {
     private val theme: ThemeViewModel by viewModels {
@@ -62,6 +63,7 @@ class MainActivity : ComponentActivity() {
                     AppShell(account.user!!,
                         detail = { id, back -> DetailRoute(JsonApi(authRepository, account.user!!.id), id, back) },
                         history = { HistoryRoute(JsonApi(authRepository, account.user!!.id), LocalOpenFragment.current) },
+                        chat = { ChatRoute(JsonApi(authRepository, account.user!!.id), LocalOpenFragment.current) },
                         feed = { FeedRoute(JsonApi(authRepository, account.user!!.id), account.user!!, LocalOpenFragment.current) }, settings = {
                         SettingsScreen(mode, theme::setMode, account, onLogout = {
                             registeredUsername = ""; showRegistration = false; showSettings = false; login.logout()

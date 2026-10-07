@@ -10,7 +10,15 @@ Kotlin + Jetpack Compose + Material 3；最低 Android 8.0（API 26），编译�
 
 Android SDK 路径通过本机 `ANDROID_HOME` 或忽略的 `local.properties` 提供。APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。在已连接的模拟器上执行 `:app:connectedDebugAndroidTest`，验证启动、主题切换和重建后偏好保留。
 
-已交付应用壳、主题、账号登录与注册、投喂、内容详情及历史回顾页面。AI 对话页面继续按独立模块接入。应用不包含阿里云、聊天供应商、数据库的凭据，所有云服务由后端调用。
+已交付应用壳、主题、账号登录与注册、投喂、内容详情、历史回顾及 AI 对话页面。分享入口、每日 AI 总结等继续按独立模块交付。应用不包含阿里云、聊天供应商、数据库的凭据，所有云服务由后端调用。
+
+## AI 对话页面
+
+对话支持新会话、分页会话列表、较早问答、逐轮流式文字和服务器核验的来源卡片；卡片打开通用详情与原文。中间检索轮次文字会清除，最终正文以已保存回答为准，不解析模型生成的媒体链接。离开页面或进入后台暂停连接，保留加密请求；已收到消息 ID 时通过 GET 确认状态，未收到时手动确认沿用原创建/消息键。确认终态且清除本机记录成功后才允许下一条发送。历史请求与发送互斥，旧连接结束不会改变新连接的忙碌状态。
+
+设备验证覆盖关闭模型的失败、页面重建后的同键确认与一条消息/会话去重；真实 DeepSeek 两轮空资料库问答验证保存结果与页面文字一致。教学样本验证使用真实 MySQL、本地 LangChain4j ONNX 与 DeepSeek，确认本人来源卡片、其他账号资料隔离、详情和原文跳转。样本的媒体对象是测试占位数据，封面回退占位图，不能据此宣称真实 OSS 播放通过。
+
+真实模型设备测试需 `AI_CHAT_API_KEY` 等环境变量，显式运行 `Test-MySql.ps1 -AndroidAuth -AndroidChatLive -AndroidTestClass com.fragpicker.android.ChatLivePageIntegrationTest`。来源样本测试另加 `-AndroidKnowledgeFixture`，选择 `ChatSourcePageIntegrationTest`，且 Maven 测试过滤应包含 `AndroidKnowledgeFixtureTest`（不设置过滤时默认包含）。样本只写入脚本新建的隔离数据库，测试账号不进入生产代码或数据。普通 Android 验证关闭模型，真实模型测试默认跳过。
 
 ## 对话通信与未确认请求
 

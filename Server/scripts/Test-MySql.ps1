@@ -1,7 +1,11 @@
-param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0, [switch]$Gradle,
+param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0, [switch]$Gradle, [switch]$AndroidChatLive, [switch]$AndroidKnowledgeFixture,
     [string]$AndroidGradleInitScript, [string]$AndroidTestClass)
 
 $ErrorActionPreference = 'Stop'
+if ($AndroidChatLive -and (-not $AndroidAuth -or [string]::IsNullOrWhiteSpace($env:AI_CHAT_API_KEY))) {
+    throw 'AndroidChatLive requires AndroidAuth and AI_CHAT_API_KEY in the process environment'
+}
+if ($AndroidKnowledgeFixture -and -not $AndroidAuth) { throw 'AndroidKnowledgeFixture requires AndroidAuth' }
 if (-not $MySqlBin) {
     $MySqlBin = Split-Path (Get-Command mysqld.exe -ErrorAction Stop).Source
 }
@@ -20,7 +24,7 @@ $port = $listener.LocalEndpoint.Port
 $listener.Stop()
 $savedEnvironment = @{}
 foreach ($name in @('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD','JWT_SIGNING_KEY',
-        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','AI_CHAT_ENABLED')) {
+        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','AI_CHAT_ENABLED','ANDROID_KNOWLEDGE_FIXTURE')) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 $testProcess = $null
@@ -50,6 +54,7 @@ try {
     $env:DB_TEST_USERNAME = 'root'
     $env:DB_TEST_PASSWORD = $testPassword
     $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+    $env:ANDROID_KNOWLEDGE_FIXTURE = if ($AndroidKnowledgeFixture) { 'true' } else { 'false' }
     Write-Output "Running integration tests on isolated MySQL at localhost:$port. Existing MySQL service is untouched."
     if ($Gradle) {
         & (Join-Path $serverRoot 'gradlew.bat') '-p' $serverRoot 'clean' 'build' '--no-daemon' '--console=plain'
@@ -67,7 +72,7 @@ try {
         $env:DB_USERNAME = $env:DB_TEST_USERNAME
         $env:DB_PASSWORD = $env:DB_TEST_PASSWORD
         $env:SERVER_PORT = "$HttpPort"
-        $env:AI_CHAT_ENABLED = 'false'
+        $env:AI_CHAT_ENABLED = if ($AndroidChatLive) { 'true' } else { 'false' }
         $jarDirectory = if ($Gradle) { 'build/libs' } else { 'target' }
         $jar = Join-Path $serverRoot "$jarDirectory/fragpicker-server-0.1.0-SNAPSHOT.jar"
         $javaExe = Join-Path $env:JAVA_HOME 'bin/java.exe'
@@ -90,6 +95,8 @@ try {
             ':app:assembleDebug', ':app:lintDebug', ':app:connectedDebugAndroidTest')
         if ($AndroidGradleInitScript) { $androidArguments += @('-I', (Resolve-Path -LiteralPath $AndroidGradleInitScript).Path) }
         if ($AndroidTestClass) { $androidArguments += "-Pandroid.testInstrumentationRunnerArguments.class=$AndroidTestClass" }
+        if ($AndroidChatLive) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.chatLive=true' }
+        if ($AndroidKnowledgeFixture) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.knowledgeFixture=true' }
         & (Join-Path $workspaceRoot 'Android/gradlew.bat') @androidArguments
         if ($LASTEXITCODE -ne 0) { throw 'Android authentication verification failed' }
     }
