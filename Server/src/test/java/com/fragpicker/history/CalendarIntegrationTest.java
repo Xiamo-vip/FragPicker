@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.*;
 class CalendarIntegrationTest {
     private static final String SCHEMA = "fragpicker_calendar_" + UUID.randomUUID().toString().replace("-", "");
     @Autowired TestRestTemplate http; @Autowired JdbcTemplate jdbc; @Autowired SubmissionService submissions;
+    @Autowired com.fragpicker.digest.DigestScheduleStore digestChanges;
     @Autowired UserAccountMapper users; @Autowired FragmentRecordMapper fragments; @Autowired IngestionJobMapper jobs; @Autowired SubmissionRecordMapper requests; @Autowired ShareLinkResolver links; @Autowired PlatformTransactionManager transactions;
     private final List<Long> owned = new ArrayList<>();
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
@@ -58,7 +59,7 @@ class CalendarIntegrationTest {
         for (String query : List.of("", "?month=", "?month=2026-1", "?month=2026-13", "?month=0999-12", "?month=10000-01", "?month=2026-10-01", "?month=invalid")) { var invalid = get(owner, query); assertThat(invalid.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST); assertThat(invalid.getBody().path("code").asText()).isEqualTo("INVALID_CALENDAR"); }
         assertThat(http.exchange("/api/v1/auth/logout", HttpMethod.POST, new HttpEntity<>(headers(owner)), Void.class).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT); assertThat(get(owner, "?month=2026-10").getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
-    private SubmissionResponse submitAt(Account owner, String instant) { var service = new SubmissionService(users, fragments, jobs, requests, links, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC)); return new TransactionTemplate(transactions).execute(status -> service.submit(owner.id(), UUID.randomUUID().toString(), new SubmissionRequest("https://b23.tv/" + UUID.randomUUID(), null))); }
+    private SubmissionResponse submitAt(Account owner, String instant) { var service = new SubmissionService(users, fragments, jobs, requests, links, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC), digestChanges); return new TransactionTemplate(transactions).execute(status -> service.submit(owner.id(), UUID.randomUUID().toString(), new SubmissionRequest("https://b23.tv/" + UUID.randomUUID(), null))); }
     private SubmissionResponse seed(Account owner, String date, String stage) { var saved = submissions.submit(owner.id(), UUID.randomUUID().toString(), new SubmissionRequest("https://b23.tv/" + UUID.randomUUID(), null)); jdbc.update("UPDATE fragments SET business_date = ?, status = ? WHERE id = ?", LocalDate.parse(date), stage, saved.fragmentId()); return saved; }
     private ResponseEntity<JsonNode> get(Account owner, String query) { return http.exchange("/api/v1/calendar" + query, HttpMethod.GET, new HttpEntity<>(headers(owner)), JsonNode.class); }
     private HttpHeaders headers(Account owner) { var headers = new HttpHeaders(); headers.setBearerAuth(owner.token()); return headers; }

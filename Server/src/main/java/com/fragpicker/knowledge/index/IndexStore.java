@@ -14,8 +14,12 @@ public class IndexStore {
     private final IndexMapper jobs;
     private final FragmentRecordMapper fragments;
     private final IndexProperties properties;
-    public IndexStore(IndexMapper jobs, FragmentRecordMapper fragments, IndexProperties properties) {
+    private final com.fragpicker.digest.DigestChangeMapper digestOwners;
+    private final com.fragpicker.digest.DigestScheduleStore digestChanges;
+    public IndexStore(IndexMapper jobs, FragmentRecordMapper fragments, IndexProperties properties,
+                      com.fragpicker.digest.DigestChangeMapper digestOwners, com.fragpicker.digest.DigestScheduleStore digestChanges) {
         properties.validate(); this.jobs = jobs; this.fragments = fragments; this.properties = properties;
+        this.digestOwners=digestOwners; this.digestChanges=digestChanges;
     }
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public Optional<IndexLease> claim() {
@@ -50,6 +54,8 @@ public class IndexStore {
     }
     @Transactional
     public boolean complete(IndexLease lease, List<IndexedChunk> chunks) {
+        // Same user->job->fragment->change order as submission and manual ingestion operations.
+        if (digestOwners.lockOwner(lease.userId()) == null) return false;
         if (jobs.lockValid(lease) == null) return false;
         if (chunks == null || chunks.isEmpty() || chunks.size() > properties.maxChunks() || chunks.stream().anyMatch(Objects::isNull))
             throw new IllegalArgumentException("Invalid index chunk collection");
@@ -59,7 +65,8 @@ public class IndexStore {
             var batch = chunks.subList(i, Math.min(i + 64, chunks.size()));
             if (jobs.insertChunks(lease, i, batch) != batch.size()) throw new IllegalStateException("Incomplete index batch");
         }
-        finish(lease.jobId(), lease.fragmentId(), lease.userId(), "READY", null, 0); return true;
+        finish(lease.jobId(), lease.fragmentId(), lease.userId(), "READY", null, 0);
+        digestChanges.changedForFragment(lease.userId(),lease.fragmentId()); return true;
     }
     @Transactional
     public boolean fail(IndexLease lease, String error, boolean retryable) {

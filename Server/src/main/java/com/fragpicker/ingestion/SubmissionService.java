@@ -28,11 +28,13 @@ public class SubmissionService {
     private final SubmissionRecordMapper requests;
     private final ShareLinkResolver links;
     private final Clock clock;
+    private final com.fragpicker.digest.DigestScheduleStore digestChanges;
 
     public SubmissionService(UserAccountMapper users, FragmentRecordMapper fragments, IngestionJobMapper jobs,
-                             SubmissionRecordMapper requests, ShareLinkResolver links, Clock clock) {
+                             SubmissionRecordMapper requests, ShareLinkResolver links, Clock clock, com.fragpicker.digest.DigestScheduleStore digestChanges) {
         this.users = users; this.fragments = fragments; this.jobs = jobs;
         this.requests = requests; this.links = links; this.clock = clock;
+        this.digestChanges = digestChanges;
     }
 
     @Transactional
@@ -70,6 +72,7 @@ public class SubmissionService {
             job.setFragmentId(fragment.getId()); job.setUserId(userId); job.setStage("QUEUED");
             job.setAttemptCount(0); job.setVersion(0L); job.setNextAttemptAt(utcNow); job.setCreatedAt(utcNow);
             jobs.insert(job);
+            digestChanges.changed(userId, fragment.getBusinessDate());
         }
         var request = new SubmissionRecord();
         request.setUserId(userId); request.setIdempotencyKey(key); request.setRequestHash(requestHash);

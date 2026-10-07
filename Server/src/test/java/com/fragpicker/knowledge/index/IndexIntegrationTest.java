@@ -67,6 +67,7 @@ class IndexIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT model_id FROM fragment_indexes WHERE fragment_id = ?", String.class, math.fragmentId())).isEqualTo(LocalEmbeddingService.MODEL_ID);
         assertThat(jdbc.queryForObject("SELECT chunker_version FROM fragment_indexes WHERE fragment_id = ?", String.class, math.fragmentId())).isEqualTo(UnicodeChunker.VERSION);
         assertThat(stage(math)).isEqualTo("READY"); assertThat(stage(cooking)).isEqualTo("READY"); assertThat(stage(foreign)).isEqualTo("READY");
+        assertThat(jdbc.queryForObject("SELECT version FROM daily_digest_changes WHERE user_id=?",Long.class,user(math))).isEqualTo(2);
         assertThat(jdbc.queryForList("SELECT fragment_id FROM fragment_index_chunks WHERE user_id = ?", Long.class, user(math))).containsOnly(math.fragmentId());
         System.out.printf("Real ONNX + MySQL index: derivative=%.4f, cooking=%.4f; owner scope and model metadata verified.%n", mathScore, cookingScore);
     }
@@ -92,6 +93,7 @@ class IndexIntegrationTest {
         assertThatThrownBy(() -> store.chunks(wrong)).isInstanceOf(IndexFailure.class); assertThat(indexes.metadata(wrong)).isEmpty(); assertThat(indexes.sentences(wrong, -1)).isEmpty();
         assertThat(store.renew(next)).isTrue(); assertThat(store.complete(next, saved())).isTrue(); assertThat(stage(item)).isEqualTo("READY");
         assertThat(store.renew(next)).isFalse();
+        assertThat(jdbc.queryForObject("SELECT version FROM daily_digest_changes WHERE user_id=?",Long.class,user(item))).isEqualTo(2);
     }
     @Test void skipsLockedRowsAndExhaustsIndependentLeaseBudget() {
         var first = pending("一"); var second = pending("二");
@@ -131,7 +133,7 @@ class IndexIntegrationTest {
     }
     @Test void rejectsOversizedInputWithoutInferenceOrSilentTruncationAndBoundsFailures() {
         var large = pending("学".repeat(10000));
-        var limited = new IndexStore(indexes, mock(FragmentRecordMapper.class), new IndexProperties(false, java.time.Duration.ofSeconds(2), java.time.Duration.ofMinutes(10), 3, java.time.Duration.ofSeconds(10), 16));
+        var limited = new IndexStore(indexes, mock(FragmentRecordMapper.class), new IndexProperties(false, java.time.Duration.ofSeconds(2), java.time.Duration.ofMinutes(10), 3, java.time.Duration.ofSeconds(10), 16), mock(com.fragpicker.digest.DigestChangeMapper.class), mock(com.fragpicker.digest.DigestScheduleStore.class));
         var lease = store.claim().orElseThrow(); assertThatThrownBy(() -> limited.chunks(lease)).isInstanceOf(IndexFailure.class);
         store.fail(lease, "INDEX_TOO_LARGE", false); assertThat(stage(large)).isEqualTo("FAILED");
         assertThat(jdbc.queryForObject("SELECT CHAR_LENGTH(summary) FROM fragment_knowledge WHERE fragment_id = ?", Integer.class, large.fragmentId())).isEqualTo(10000);
