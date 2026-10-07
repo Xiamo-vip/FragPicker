@@ -2,6 +2,8 @@
 
 后端运行基线：Java 21、Spring Boot 3.5。支持 Maven Wrapper 和 Gradle Wrapper；Gradle 8.13 构建入口位于本目录的 `settings.gradle` 与 `build.gradle`。Gradle 从 `pom.xml` 读取直接依赖、版本和排除项，维护依赖时更新 POM；升级 Spring Boot 时同时更新 Gradle 插件版本，构建会检查两者一致。
 
+首次运行参见 [可用版本快速启动](../docs/QUICK_START.md)。复制 .env.example 为本机 .env，填写数据库及 JWT，使用 scripts/Start-Server.ps1 -Check 检查，再去掉 -Check 启动业务；已有终端环境变量优先。启动器只读字面值，不执行配置表达式，不输出凭据；退出后恢复加载前环境。6项配置验证通过，覆盖最小配置、短密钥拒绝、工作器依赖、重复配置与错误脱敏、系统变量拒绝、字面值和环境恢复；连接验证由服务启动与真实集成测试完成。
+
 ## IDEA 导入与 Gradle 构建
 
 后端 Gradle 项目目录是 `Server`。在 IDEA 的 Gradle 工具窗口选择 Link Gradle Project，关联 `Server/build.gradle`；Gradle Distribution 选 Wrapper，Gradle JVM 选 JDK 21。仓库根目录可同时关联 Android 与 Server 两个独立 Gradle 项目。已通过 Maven 导入后端时，先解除 `Server/pom.xml` 的 Maven 关联，再改用 Gradle，避免重复导入同一源码。
