@@ -1,4 +1,5 @@
-param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0, [switch]$Gradle)
+param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0, [switch]$Gradle,
+    [string]$AndroidGradleInitScript, [string]$AndroidTestClass)
 
 $ErrorActionPreference = 'Stop'
 if (-not $MySqlBin) {
@@ -84,9 +85,12 @@ try {
         }
         if (-not $healthy) { throw 'Isolated backend did not become healthy' }
         Write-Output 'Running Android login integration against the isolated real backend and database.'
-        & (Join-Path $workspaceRoot 'Android/gradlew.bat') '-p' (Join-Path $workspaceRoot 'Android') `
-            "-PAPI_BASE_URL=http://10.0.2.2:$HttpPort" '-Pandroid.testInstrumentationRunnerArguments.realBackend=true' `
-            ':app:assembleDebug' ':app:lintDebug' ':app:connectedDebugAndroidTest'
+        $androidArguments = @('-p', (Join-Path $workspaceRoot 'Android'),
+            "-PAPI_BASE_URL=http://10.0.2.2:$HttpPort", '-Pandroid.testInstrumentationRunnerArguments.realBackend=true',
+            ':app:assembleDebug', ':app:lintDebug', ':app:connectedDebugAndroidTest')
+        if ($AndroidGradleInitScript) { $androidArguments += @('-I', (Resolve-Path -LiteralPath $AndroidGradleInitScript).Path) }
+        if ($AndroidTestClass) { $androidArguments += "-Pandroid.testInstrumentationRunnerArguments.class=$AndroidTestClass" }
+        & (Join-Path $workspaceRoot 'Android/gradlew.bat') @androidArguments
         if ($LASTEXITCODE -ne 0) { throw 'Android authentication verification failed' }
     }
 } finally {

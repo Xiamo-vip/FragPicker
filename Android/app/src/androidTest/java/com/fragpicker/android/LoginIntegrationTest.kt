@@ -18,6 +18,7 @@ import java.util.UUID
 
 /** Opt in only against the isolated Spring Boot + MySQL harness. No mock server. */
 class LoginIntegrationTest {
+    @org.junit.After fun cleanup() = cleanupRealSession()
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
     @Test

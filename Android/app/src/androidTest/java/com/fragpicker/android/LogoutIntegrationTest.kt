@@ -14,6 +14,7 @@ import org.junit.Test
 import java.util.UUID
 
 class LogoutIntegrationTest {
+    @org.junit.After fun cleanup() = cleanupRealSession()
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
     @Test

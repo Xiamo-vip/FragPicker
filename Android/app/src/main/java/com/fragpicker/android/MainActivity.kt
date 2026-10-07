@@ -28,12 +28,14 @@ import com.fragpicker.android.core.auth.*
 import com.fragpicker.android.feature.auth.*
 import com.fragpicker.android.feature.settings.SettingsScreen
 import com.fragpicker.android.core.ui.AppShell
+import com.fragpicker.android.core.network.JsonApi
+import com.fragpicker.android.feature.feed.FeedRoute
 
 class MainActivity : ComponentActivity() {
     private val theme: ThemeViewModel by viewModels {
         viewModelFactory { initializer { ThemeViewModel(ThemeRepository(applicationContext)) } }
     }
-    private val authRepository by lazy { AuthRepository(AuthApi(), SessionVault(applicationContext)) }
+    private val authRepository get() = (application as FragPickerApplication).authRepository
     private val login: LoginViewModel by viewModels {
         viewModelFactory { initializer { LoginViewModel(authRepository) } }
     }
@@ -54,7 +56,7 @@ class MainActivity : ComponentActivity() {
             BackHandler(enabled = showRegistration || showSettings) { showRegistration = false; showSettings = false }
             FragmentsPickerTheme(mode) {
                 if (account.user != null) {
-                    AppShell(account.user!!, settings = {
+                    AppShell(account.user!!, feed = { FeedRoute(JsonApi(authRepository, account.user!!.id), account.user!!) }, settings = {
                         SettingsScreen(mode, theme::setMode, account, onLogout = {
                             registeredUsername = ""; showRegistration = false; showSettings = false; login.logout()
                         })

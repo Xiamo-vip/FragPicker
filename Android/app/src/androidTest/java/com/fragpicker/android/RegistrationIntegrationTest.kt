@@ -12,6 +12,7 @@ import org.junit.Test
 import java.util.UUID
 
 class RegistrationIntegrationTest {
+    @org.junit.After fun cleanup() = cleanupRealSession()
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
 
     @Test

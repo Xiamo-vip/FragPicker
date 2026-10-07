@@ -25,6 +25,28 @@ class AuthRepository(private val api: AuthApi, private val vault: SessionVault) 
         api.register(username, password)
     }
 
+    suspend fun <T> authorized(userId: Long, operation: suspend (String) -> T): T {
+        val token = mutex.withLock { ownedSession(userId).accessToken }
+        try { return operation(token) }
+        catch (failure: AuthApiFailure) {
+            if (failure.status != 401) throw failure
+            val refreshed = mutex.withLock {
+                val current = ownedSession(userId)
+                if (current.accessToken == token) {
+                    val refresh = withContext(Dispatchers.IO) { vault.consume() }
+                        ?: throw AuthApiFailure(401, "SESSION_EXPIRED")
+                    activate(api.refresh(refresh))
+                }
+                ownedSession(userId).accessToken
+            }
+            // Only authentication failure retries; callers keep the exact same idempotency key.
+            return operation(refreshed)
+        }
+    }
+
+    private fun ownedSession(userId: Long): LoginSession = activeSession?.takeIf { it.user.id == userId }
+        ?: throw AuthApiFailure(401, "SESSION_EXPIRED")
+
     suspend fun logout(): Boolean = mutex.withLock {
         try {
             val session = activeSession ?: return@withLock false
