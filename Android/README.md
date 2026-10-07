@@ -44,7 +44,11 @@ Android 分享面板可选择 FragmentsPicker，接收 `ACTION_SEND` 的 `text/p
 
 ## 设置与外观
 
-已登录后使用悬浮液态玻璃导航进入投喂、回顾、对话、设置。导航采用 [AndroidLiquidGlass / Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) 1.0.0 的背景捕获、模糊和透镜折射，配合弹簧移动胶囊与 Material 图标。固定版本与当前 Kotlin 2.2.21 / Compose 1.9.4 兼容；Android 12 以下无实时模糊，Android 13 以下无透镜折射，保持可读的主题表面与完整导航功能。输入键盘打开时隐藏底部导航，退出账号时清理业务 ViewModel。导航测试覆盖四个标签、设置入口和手动深色主题。
+已登录后使用悬浮液态玻璃导航进入投喂、回顾、对话、设置。导航移植用户指定的 [LiquidBottomTabs](https://github.com/Kyant0/AndroidLiquidGlass/blob/kmp/app/src/commonMain/kotlin/com/kyant/backdrop/catalog/components/LiquidBottomTabs.kt)：64dp 底层、4dp 内边距、56dp 选中胶囊、蓝色强调标签、连续曲率外形、三层背景组合、原模糊/透镜与弹簧参数，支持拖动选中胶囊。底层与强调层的按压高亮显式 clip 在 Capsule 内，标签使用官方无 Material ripple 的点击实现；图标与文字保留 APP 的四个业务入口。主题跟随 APP 设置；重组、尺寸变化和 RTL 使用最新状态。
+
+使用 Backdrop 1.0.0 保持 Kotlin 2.2.21 / Compose 1.9.4 兼容；源码移植及许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。为固定版透镜提供 CornerBasedShape 适配，外轮廓保留官方连续曲率。Android 12 以下无实时模糊，Android 13 以下无透镜折射，保持可读表面与导航功能。输入键盘打开时隐藏导航，退出账号时清理业务 ViewModel。
+
+2026-10-07 三项 Android 16 设备验证全部通过，覆盖四标签切换、设置主题切换后连续点击、LTR/RTL 拖动选中，以及实际激活高亮后圆角外像素不变；lintDebug 通过。已检查浅色和暗色界面截图。
 
 主题切换位于设置页，提供浅色、深色、跟随系统三种模式；外观偏好通过 DataStore 保存。登录前也可从右上角设置按钮进入。账号信息和退出入口位于设置页，退出前二次确认。
 

@@ -2,12 +2,8 @@ package com.fragpicker.android.core.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Chat
@@ -22,7 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -31,12 +27,11 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.fragpicker.android.core.auth.UserProfile
 import com.fragpicker.android.core.theme.appBackground
+import com.fragpicker.android.core.ui.liquid.LiquidBottomTabs
+import com.fragpicker.android.core.ui.liquid.LiquidBottomTab
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
 
 enum class Destination(val label: String, val icon: ImageVector) {
     FEED("投喂", Icons.Rounded.AddLink), HISTORY("回顾", Icons.Rounded.CalendarMonth),
@@ -93,28 +88,15 @@ fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
 
 @Composable
 private fun GlassNavigation(selected: Destination, select: (Destination) -> Unit, backdrop: Backdrop, modifier: Modifier) {
-    val colors = MaterialTheme.colorScheme
-    val position by animateFloatAsState(selected.ordinal.toFloat(), spring(dampingRatio = .78f), label = "glass selection")
-    BoxWithConstraints(modifier.widthIn(max = 560.dp).fillMaxWidth().height(72.dp)) {
-        val itemWidth = maxWidth / Destination.entries.size
-        val tint = colors.surface.copy(alpha = .78f)
-        Box(Modifier.fillMaxSize().drawBackdrop(backdrop, shape = { RoundedCornerShape(36.dp) },
-            effects = { blur(10.dp.toPx()); lens(18.dp.toPx(), 28.dp.toPx()) },
-            onDrawSurface = { drawRect(tint) }))
-        Box(Modifier.padding(5.dp).offset(x = itemWidth * position)
-            .width(itemWidth - 10.dp).height(62.dp).drawBackdrop(backdrop,
-                shape = { RoundedCornerShape(32.dp) }, effects = { blur(4.dp.toPx()); lens(14.dp.toPx(), 22.dp.toPx()) },
-                onDrawSurface = { drawRect(colors.primaryContainer.copy(alpha = .7f)) }))
-        Row(Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        LiquidBottomTabs(selectedTabIndex = { selected.ordinal }, onTabSelected = { select(Destination.entries[it]) },
+            backdrop = backdrop, tabsCount = Destination.entries.size,
+            modifier = modifier.widthIn(max = 560.dp).fillMaxWidth().testTag("liquid_tabs")) {
             Destination.entries.forEach { destination ->
-                Column(Modifier.weight(1f).fillMaxHeight().testTag("nav_${destination.name}")
-                    .semantics { contentDescription = destination.label }
-                    .selectable(selected == destination, role = Role.Tab, onClick = { select(destination) }),
-                    verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                    val color = if (selected == destination) colors.onPrimaryContainer else colors.onSurfaceVariant
-                    Icon(destination.icon, null, tint = color)
-                    Spacer(Modifier.height(4.dp))
-                    Text(destination.label, style = MaterialTheme.typography.labelMedium, color = color)
+                LiquidBottomTab(onClick = { select(destination) }, modifier = Modifier.testTag("nav_${destination.name}")
+                    .semantics { contentDescription = destination.label; this.selected = selected == destination }) {
+                    Icon(destination.icon, null, modifier = Modifier.size(26.dp))
+                    Text(destination.label, style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
