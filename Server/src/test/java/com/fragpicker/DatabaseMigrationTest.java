@@ -38,7 +38,7 @@ class DatabaseMigrationTest {
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
         assertThat(dataSource.getMaximumPoolSize()).isEqualTo(4);
         assertThat(dataSource.getMinimumIdle()).isZero();
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("11");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("12");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))
@@ -126,6 +126,17 @@ class DatabaseMigrationTest {
                 try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
                     try (var row = statement.executeQuery("SELECT question, answer FROM chat_turns WHERE user_id = 1")) { assertThat(row.next()).isTrue(); assertThat(row.getString("question")).isEqualTo("旧问题"); assertThat(row.getString("answer")).isEqualTo("旧答案"); }
                     try (var row = statement.executeQuery("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('daily_digests','daily_digest_sources','daily_digest_checkpoints','daily_digest_requests')")) { assertThat(row.next()).isTrue(); assertThat(row.getInt(1)).isEqualTo(4); }
+                }
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement()) {
+                    statement.execute("UPDATE fragments SET created_at='2026-10-06 13:59:00' WHERE id=1");
+                    statement.execute("INSERT INTO fragments (id,user_id,source_url,source_hash,source_host,business_date,business_zone,status,created_at) VALUES (2,1,'https://b23.tv/late',REPEAT('b',64),'b23.tv','2026-10-07','Asia/Shanghai','QUEUED','2026-10-07 15:00:00')");
+                }
+                assertThat(Flyway.configure().dataSource(url, username, password).target("12").load().migrate().migrationsExecuted).isEqualTo(1);
+                try (var connection = java.sql.DriverManager.getConnection(url, username, password); var statement = connection.createStatement();
+                     var rows = statement.executeQuery("SELECT business_date,due_at,version,scheduled_version FROM daily_digest_changes WHERE user_id=1 ORDER BY business_date")) {
+                    assertThat(rows.next()).isTrue(); assertThat(rows.getString("due_at")).startsWith("2026-10-06 14:00:00");
+                    assertThat(rows.getLong("version")).isEqualTo(1); assertThat(rows.getLong("scheduled_version")).isZero();
+                    assertThat(rows.next()).isTrue(); assertThat(rows.getString("due_at")).startsWith("2026-10-07 16:15:00"); assertThat(rows.next()).isFalse();
                 }
             } finally { ddl.execute("DROP DATABASE " + schema); }
         }
