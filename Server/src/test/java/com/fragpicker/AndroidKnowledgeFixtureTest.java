@@ -27,6 +27,7 @@ class AndroidKnowledgeFixtureTest {
     @Autowired IndexStore indexes;
     @Autowired @Lazy LocalEmbeddingService embeddings;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.fragpicker.digest.DigestStore digests;
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", () -> System.getenv("DB_TEST_URL"));
         registry.add("spring.datasource.username", () -> System.getenv("DB_TEST_USERNAME"));
@@ -35,11 +36,22 @@ class AndroidKnowledgeFixtureTest {
     @Test void preparesOwnedAndForeignIndexedTeachingSourcesForDeviceVerification() {
         long owner = registrations.register(new RegisterRequest("android_fixture", "Android-fixture-123!")).id();
         long foreign = registrations.register(new RegisterRequest("android_foreign", "Android-fixture-123!")).id();
-        long fragment = source(owner, "导数与瞬时变化率课程"); source(foreign, "其他人的秘密数学课程");
+        long fragment = source(owner, "导数与瞬时变化率课程"); long foreignFragment=source(foreign, "其他人的秘密数学课程");
         var worker = new IndexWorker(indexes, embeddings);
         assertThat(worker.runOnce()).isTrue(); assertThat(worker.runOnce()).isTrue();
         assertThat(jdbc.queryForObject("SELECT status FROM fragments WHERE id = ?", String.class, fragment)).isEqualTo("READY");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fragments WHERE status = 'READY'", Integer.class)).isEqualTo(2);
+        digest(owner,fragment,"今天学习了导数与瞬时变化率，先理解极限，再练习求导。");
+        digest(foreign,foreignFragment,"其他人的秘密每日总结");
+    }
+    private void digest(long owner,long fragment,String summary) {
+        var day=jdbc.queryForObject("SELECT business_date FROM fragments WHERE id=?",java.time.LocalDate.class,fragment);
+        digests.enqueue(owner,day,java.time.LocalDateTime.of(2000,1,1,0,0),false);
+        var lease=digests.claim().orElseThrow(); digests.snapshot(lease);
+        assertThat(digests.complete(lease,new com.fragpicker.digest.DigestPiece(owner,day,1,1,summary,
+            List.of(new com.fragpicker.digest.DigestPoint("通过切线斜率理解导数",List.of(fragment))),
+            List.of(com.fragpicker.knowledge.EnrichmentResult.Category.LEARNING),List.of("导数","变化率")))).isTrue();
+        jdbc.update("UPDATE daily_digest_changes SET scheduled_version=version WHERE user_id=? AND business_date=?",owner,day);
     }
     private long source(long owner, String title) {
         String summary = "导数描述函数的瞬时变化率。用差商极限求导，可以计算曲线切线斜率，建议先学习极限再练习求导。";

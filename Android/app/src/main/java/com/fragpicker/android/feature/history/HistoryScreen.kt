@@ -13,6 +13,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -29,19 +30,24 @@ import java.time.*
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HistoryRoute(api: JsonApi, onOpen: (Long) -> Unit) {
-    val model: HistoryViewModel = viewModel(factory = viewModelFactory { initializer { HistoryViewModel(api) } })
+    val context = LocalContext.current.applicationContext
+    val model: HistoryViewModel = viewModel(factory = viewModelFactory { initializer {
+        HistoryViewModel(api, DigestRequestStore(context.getSharedPreferences("digest_requests", android.content.Context.MODE_PRIVATE), api.baseUrl, api.userId))
+    } })
     val state by model.state.collectAsStateWithLifecycle()
     val today = LocalDate.now(ZoneId.of("Asia/Shanghai"))
     var date by rememberSaveable { mutableStateOf(today.toString()) }
     var monthText by rememberSaveable { mutableStateOf(YearMonth.from(today).toString()) }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
+    var sourcesVisible by rememberSaveable(date) { mutableStateOf(false) }
+    var confirmRegenerate by remember { mutableStateOf(false) }
     val month = YearMonth.parse(monthText)
     val lifecycle = LocalLifecycleOwner.current
     LaunchedEffect(lifecycle, monthText) { lifecycle.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
         model.calendar(monthText); awaitCancellation()
     } }
     LaunchedEffect(lifecycle, date) { category = null; lifecycle.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-        model.select(date); awaitCancellation()
+        model.select(date); try { awaitCancellation() } finally { model.pauseSummary(date) }
     } }
     val selectedDay = state.days[date]
     Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, topBar = { TopAppBar(title = { Text("回顾") }, actions = {
@@ -89,6 +95,12 @@ fun HistoryRoute(api: JsonApi, onOpen: (Long) -> Unit) {
                 Text("本日共${selectedDay?.optLong("total") ?: 0}条 · 已整理${selectedDay?.optLong("ready") ?: 0} · 处理中${selectedDay?.optLong("processing") ?: 0} · 失败${selectedDay?.optLong("failed") ?: 0}",
                     style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("history_counts"))
             }
+            item(key = "daily_summary") {
+                DailyDigestPanel(state, sourcesVisible, { sourcesVisible = !sourcesVisible }, { confirmRegenerate = true }, model::regenerate, model::summary)
+            }
+            if (sourcesVisible) items(state.digest?.optJSONObject("result")?.optJSONArray("sources")?.objects().orEmpty(), key = { "digest_source_${it.getLong("fragmentId")}" }) {
+                FragmentCard(api, it, onOpen, tagPrefix = "digest_source")
+            }
             val categories = state.items.flatMap { it.optJSONArray("categories")?.strings().orEmpty() }.distinct()
             if (categories.isNotEmpty()) item {
                 Text("筛选已加载资料", style = MaterialTheme.typography.labelLarge)
@@ -109,4 +121,8 @@ fun HistoryRoute(api: JsonApi, onOpen: (Long) -> Unit) {
             state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = { model.select(date) }) { Text("重新加载当天资料") } } }
         }
     }
+    if (confirmRegenerate) AlertDialog(onDismissRequest = { confirmRegenerate = false }, title = { Text("整理 $date") },
+        text = { Text("整理当天已完成的资料，可能产生模型费用。处理中和失败的资料不会作为总结依据。") },
+        confirmButton = { TextButton(onClick = { confirmRegenerate = false; model.regenerate() }, modifier = Modifier.testTag("digest_accept")) { Text("确认整理") } },
+        dismissButton = { TextButton(onClick = { confirmRegenerate = false }) { Text("取消") } })
 }

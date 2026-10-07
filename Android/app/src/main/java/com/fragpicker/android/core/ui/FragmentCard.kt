@@ -10,9 +10,9 @@ import com.fragpicker.android.core.network.*
 import org.json.JSONObject
 
 @Composable
-fun FragmentCard(api: JsonApi, item: JSONObject, onOpen: (Long) -> Unit) {
+fun FragmentCard(api: JsonApi, item: JSONObject, onOpen: (Long) -> Unit, tagPrefix: String = "fragment") {
     val id = item.getLong("fragmentId")
-    ElevatedCard(onClick = { onOpen(id) }, modifier = Modifier.fillMaxWidth().testTag("fragment_$id"), shape = MaterialTheme.shapes.extraLarge) {
+    ElevatedCard(onClick = { onOpen(id) }, modifier = Modifier.fillMaxWidth().testTag("${tagPrefix}_$id"), shape = MaterialTheme.shapes.extraLarge) {
         SignedCover(api, id, item.optionalString("coverMediaPath") != null, Modifier.fillMaxWidth().height(148.dp))
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(item.optionalString("title") ?: "投喂记录", style = MaterialTheme.typography.titleMedium)
