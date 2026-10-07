@@ -40,7 +40,9 @@ class ChatTurnEngineTest {
         var result = stream(List.of(new ConversationExchange("旧问题", "旧答案")), "新问题", new TurnCancellation(), new ChatTurnListener() { @Override public void delta(int round, String text) { chunks.add(text); } });
         assertThat(chunks).containsExactly("这是", "回答"); assertThat(result.answer()).isEqualTo("这是回答"); assertThat(result.cards()).isEmpty(); assertThat(result.modelRounds()).isEqualTo(1);
         assertThat(request.get().messages()).extracting(ChatMessage::type).containsExactly(ChatMessageType.SYSTEM, ChatMessageType.USER, ChatMessageType.AI, ChatMessageType.USER);
-        assertThat(request.get().toolSpecifications()).singleElement().satisfies(spec -> assertThat(spec.name()).isEqualTo(HistorySearchTool.NAME)); assertThat(result.toString()).doesNotContain("回答", "private-reasoning");
+        assertThat(request.get().toolSpecifications()).extracting(spec -> spec.name()).containsExactlyInAnyOrder(HistorySearchTool.NAME,HistorySearchTool.DIGEST_NAME);
+        assertThat(((SystemMessage)request.get().messages().getFirst()).text()).contains("北京时间今天是", "getDailyDigest");
+        assertThat(result.toString()).doesNotContain("回答", "private-reasoning");
     }
     @Test void dispatchesOwnedToolAndKeepsOriginalReasoningForProviderContinuationAndTrustedCards() {
         var card = card(); when(search.search(eq(9L), any())).thenReturn(new SearchResponse(List.of(card), 1));
@@ -114,7 +116,7 @@ class ChatTurnEngineTest {
         }
         verifyNoInteractions(search);
     }
-    @SuppressWarnings("unchecked") private ChatTurnEngine engine(StreamingChatModel supplied, ChatTurnProperties properties) { ObjectProvider<StreamingChatModel> provider = mock(ObjectProvider.class); when(provider.getIfAvailable()).thenReturn(supplied); return new ChatTurnEngine(provider, new HistoryToolFactory(search, new ObjectMapper().findAndRegisterModules()), properties); }
+    @SuppressWarnings("unchecked") private ChatTurnEngine engine(StreamingChatModel supplied, ChatTurnProperties properties) { ObjectProvider<StreamingChatModel> provider = mock(ObjectProvider.class); when(provider.getIfAvailable()).thenReturn(supplied); return new ChatTurnEngine(provider, new HistoryToolFactory(search, new ObjectMapper().findAndRegisterModules(), mock(com.fragpicker.digest.DigestReadService.class)), properties); }
     private ChatTurnResult stream(List<ConversationExchange> history, String question, TurnCancellation cancellation, ChatTurnListener listener) { return engine.stream(new CurrentUser(9L), history, question, cancellation, listener); }
     private void emit(StreamingChatResponseHandler callback, String... tokens) { for (String token : tokens) callback.onPartialResponse(new PartialResponse(token), new PartialResponseContext(handle)); }
     private void complete(StreamingChatResponseHandler callback, AiMessage message) { callback.onCompleteResponse(ChatResponse.builder().aiMessage(message).build()); }

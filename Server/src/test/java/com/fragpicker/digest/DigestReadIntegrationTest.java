@@ -24,6 +24,7 @@ class DigestReadIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired SubmissionService submissions;
     @Autowired DigestStore store;
+    @Autowired com.fragpicker.knowledge.tool.HistoryToolFactory tools;
     private final List<Long> owners=new ArrayList<>();
     @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url",() -> System.getenv("DB_TEST_URL"));
@@ -87,6 +88,14 @@ class DigestReadIntegrationTest {
         var owner=login(); long source=seed(owner,"READY"); complete(owner,source); jdbc.update("DELETE FROM fragments WHERE id=?",source);
         var stale=get(owner,DAY.toString()).getBody(); assertThat(stale.path("status").asText()).isEqualTo("STALE");
         assertThat(stale.path("result").isNull()).isTrue(); assertThat(stale.path("errorCode").asText()).isEqualTo("DIGEST_SOURCE_CHANGED");
+    }
+    @Test void boundToolReadsOnlyOwnedDayAndReportsAnotherAccountsDayAsEmpty() throws Exception {
+        var owner=login(); var foreign=login(); long source=seed(owner,"READY"); complete(owner,source);
+        var request=dev.langchain4j.agent.tool.ToolExecutionRequest.builder().id("daily").name("getDailyDigest").arguments("{\"date\":\"2026-10-05\"}").build();
+        var mine=tools.bind(new com.fragpicker.auth.CurrentUser(owner.id())).execute(request);
+        assertThat(mine).contains("导数课程回顾","READY").doesNotContain("fragmentId","userId","lease");
+        var other=tools.bind(new com.fragpicker.auth.CurrentUser(foreign.id())).execute(request);
+        assertThat(other).contains("EMPTY").doesNotContain("导数课程回顾");
     }
     private record Account(long id,String token) { @Override public String toString() { return "Account[REDACTED]"; } }
 }

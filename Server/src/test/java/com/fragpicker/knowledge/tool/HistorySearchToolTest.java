@@ -18,9 +18,12 @@ class HistorySearchToolTest {
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
     private SearchService search;
     private HistoryToolFactory factory;
-    @BeforeEach void setup() { search = mock(SearchService.class); factory = new HistoryToolFactory(search, json); when(search.search(anyLong(), any())).thenReturn(new SearchResponse(List.of(), 0)); }
+    private com.fragpicker.digest.DigestReadService digests;
+    @BeforeEach void setup() { search = mock(SearchService.class); digests=mock(com.fragpicker.digest.DigestReadService.class); factory = new HistoryToolFactory(search, json, digests); when(search.search(anyLong(), any())).thenReturn(new SearchResponse(List.of(), 0)); }
     @Test void registersOnlyReadOnlyArgumentsAndBindsOwnerOutsideModelSchema() {
-        var tool = factory.bind(new CurrentUser(9L)); var specs = tool.specifications(); assertThat(specs).hasSize(1); var spec = specs.getFirst();
+        var tool = factory.bind(new CurrentUser(9L)); var specs = tool.specifications(); assertThat(specs).hasSize(2); var spec = specs.stream().filter(value -> value.name().equals(HistorySearchTool.NAME)).findFirst().orElseThrow();
+        var digest=specs.stream().filter(value -> value.name().equals(HistorySearchTool.DIGEST_NAME)).findFirst().orElseThrow();
+        assertThat(digest.parameters().properties().keySet()).containsExactly("date"); assertThat(digest.parameters().required()).containsExactly("date");
         assertThat(spec.name()).isEqualTo(HistorySearchTool.NAME); assertThat(spec.parameters().properties().keySet()).containsExactlyInAnyOrder("query", "fromDate", "toDate", "category", "author", "keyword");
         assertThat(spec.parameters().required()).containsExactly("query"); assertThatThrownBy(() -> factory.bind(null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> factory.bind(new CurrentUser(0L))).isInstanceOf(IllegalArgumentException.class);
@@ -54,4 +57,20 @@ class HistorySearchToolTest {
         assertThat(factory.bind(new CurrentUser(9L)).execute(call("{\"query\":\"导数\",\"category\":\"UNKNOWN\"}"))).contains("INVALID_TOOL_ARGUMENTS");
     }
     private ToolExecutionRequest call(String arguments) { return ToolExecutionRequest.builder().id("test-call").name(HistorySearchTool.NAME).arguments(arguments).build(); }
+    @Test void dailySummaryUsesFixedOwnerAndDoesNotManufactureCardsOrExposeIds() throws Exception {
+        var day=LocalDate.of(2026,10,6);
+        var result=new com.fragpicker.digest.DailyDigestResponse.Result("导数课程回顾",1,List.of(new com.fragpicker.digest.DigestPoint("瞬时变化率",List.of(42L))),List.of(Category.LEARNING),List.of("导数"),List.of());
+        when(digests.get(9,"2026-10-06")).thenReturn(new com.fragpicker.digest.DailyDigestResponse(day,"READY",1,1,0,0,2,1,java.time.Instant.EPOCH,null,true,false,null,result));
+        var tool=factory.bind(new CurrentUser(9L)); var response=json.readTree(tool.execute(daily("{\"date\":\"2026-10-06\"}")));
+        assertThat(response.path("summary").asText()).isEqualTo("导数课程回顾"); assertThat(response.path("outdated").asBoolean()).isTrue();
+        assertThat(response.toString()).doesNotContain("fragmentId","sourceIds","userId","videoMediaPath"); assertThat(tool.cards()).isEmpty(); verify(digests).get(9,"2026-10-06");
+        tool.execute(call("{\"query\":\"导数\"}")); tool.execute(call("{\"query\":\"导数\"}"));
+        assertThat(tool.execute(daily("{\"date\":\"2026-10-06\"}"))).contains("TOOL_LIMIT_REACHED"); verifyNoMoreInteractions(digests);
+    }
+    @Test void rejectsDailyOwnerInjectionAndWrongDateTypesWithoutReading() {
+        for (String args:List.of("{\"date\":\"2026-10-06\",\"userId\":10}","{\"date\":123}","{\"date\":\"2026-10-06\",\"date\":\"2026-10-07\"}"))
+            assertThat(factory.bind(new CurrentUser(9L)).execute(daily(args))).contains("INVALID_TOOL_ARGUMENTS");
+        verifyNoInteractions(digests);
+    }
+    private ToolExecutionRequest daily(String args) { return ToolExecutionRequest.builder().id("daily-call").name(HistorySearchTool.DIGEST_NAME).arguments(args).build(); }
 }
