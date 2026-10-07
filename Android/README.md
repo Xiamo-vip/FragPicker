@@ -20,6 +20,8 @@ Android SDK 路径通过本机 `ANDROID_HOME` 或忽略的 `local.properties` �
 
 ## 登录与后端地址
 
+任务状态组件 `ProcessingCard` 使用圆点 → 胶囊 → 信息卡动效：以中心展开宽度，再展示标题与不确定进度，完成或失败时先增加高度，再补足卡片宽度并显示正文和动作。显示真实阶段，不虚构处理百分比；遵循 Compose 系统动画比例。组件测试覆盖等待、完成、失败及动作点击。
+
 Debug 默认使用 Android 模拟器宿主地址 `http://10.0.2.2:18080`；将本机后端的 `SERVER_PORT` 配置为18080，并启用 `database` profile。也可通过构建参数 `-PAPI_BASE_URL=https://your-backend` 改地址，支持必要的路径前缀。发布构建必须显式配置 HTTPS 地址，否则构建失败。明文 HTTP 仅在 Debug 对模拟器宿主与 loopback 开放，Release 禁止明文流量。
 
 登录使用已有后端 `/auth/login` 和 `/users/me`，错误密码与网络失败有界面提示，提交期间禁用重复操作，密码不保存到偏好或重建状态。访问令牌仅在内存；刷新令牌用 Android Keystore AES-GCM 加密后保存，密文绑定当前后端地址，备份和迁移禁用。进程重启通过一次性刷新恢复会话，刷新串行执行；发送前删除旧令牌，无法确定是否成功的请求不重放，需重新登录。
