@@ -44,20 +44,31 @@ enum class Destination(val label: String, val icon: ImageVector) {
     CHAT("对话", Icons.AutoMirrored.Rounded.Chat), SETTINGS("设置", Icons.Rounded.Settings)
 }
 
+val LocalOpenFragment = staticCompositionLocalOf<(Long) -> Unit> { {} }
+val LocalNavigationInset = staticCompositionLocalOf { 0.dp }
+
 @Composable
 fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
+             detail: (@Composable (Long, () -> Unit) -> Unit)? = null,
              feed: @Composable () -> Unit = { Overview("投喂", "欢迎回来，${user.username}", "让值得记住的内容，在这里沉淀。") },
              history: @Composable () -> Unit = { Overview("回顾", "翻阅你的知识日历", "按日期找回曾经收藏的灵感。") },
              chat: @Composable () -> Unit = { Overview("对话", "和记忆聊一聊", "描述你要找的内容，连接零散的知识。") }) {
     var destination by rememberSaveable { mutableStateOf(Destination.FEED) }
+    var detailId by rememberSaveable { mutableStateOf<Long?>(null) }
     val holder = rememberSaveableStateHolder()
     val store = remember(user.id) { ViewModelStore() }
     val owner = remember(store) { object : ViewModelStoreOwner { override val viewModelStore = store } }
     DisposableEffect(store) { onDispose { store.clear() } }
     val backdrop = rememberLayerBackdrop()
     val colors = MaterialTheme.colorScheme
-    BackHandler(enabled = destination != Destination.FEED) { destination = Destination.FEED }
-    CompositionLocalProvider(LocalViewModelStoreOwner provides owner) {
+    BackHandler(enabled = detailId != null || destination != Destination.FEED) {
+        if (detailId != null) detailId = null else destination = Destination.FEED
+    }
+    CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalOpenFragment provides { detailId = it },
+        LocalNavigationInset provides if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) 100.dp else 0.dp) {
+        if (detailId != null && detail != null) {
+            detail(detailId!!) { detailId = null }
+        } else {
         Box(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().layerBackdrop(backdrop).background(
                 Brush.verticalGradient(listOf(colors.surface, colors.primaryContainer.copy(alpha = .5f), colors.surface)))) {
@@ -76,6 +87,7 @@ fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
                 GlassNavigation(destination, { destination = it }, backdrop,
                     Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp))
             }
+        }
         }
     }
 }

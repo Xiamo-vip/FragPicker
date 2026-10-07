@@ -47,7 +47,7 @@ fun FeedRoute(api: JsonApi, user: UserProfile, onOpen: ((Long) -> Unit)? = null)
     val keyboard = LocalSoftwareKeyboardController.current
     Scaffold(containerColor = Color.Transparent, topBar = { TopAppBar(title = { Text("投喂") },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState())
+        Column(Modifier.fillMaxSize().padding(padding).padding(bottom = LocalNavigationInset.current).imePadding().verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("欢迎回来，${user.username}", style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -83,9 +83,10 @@ fun FeedRoute(api: JsonApi, user: UserProfile, onOpen: ((Long) -> Unit)? = null)
                     modifier = Modifier.testTag("feed_result"),
                     actionLabel = if (onOpen != null) "查看内容" else null, action = onOpen?.let { { it(id) } })
                 TextButton(onClick = model::retryStatus) { Text("刷新处理状态") }
+                if (visual == ProcessingVisual.WAITING && onOpen != null) TextButton(onClick = { onOpen(id) }) { Text("查看内容") }
             }
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("feed_error")) }
-            Spacer(Modifier.height(110.dp))
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
