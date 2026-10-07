@@ -19,11 +19,13 @@ public class MediaJobStore {
     private final VideoMetadataMapper metadata;
     private final StoredMediaMapper media;
     private final MediaWorkerProperties properties;
+    private final com.fragpicker.ingestion.deletion.DeletionMapper deletions;
 
     public MediaJobStore(MediaJobMapper jobs, FragmentRecordMapper fragments, VideoMetadataMapper metadata,
-                         StoredMediaMapper media, MediaWorkerProperties properties) {
+                         StoredMediaMapper media, MediaWorkerProperties properties, com.fragpicker.ingestion.deletion.DeletionMapper deletions) {
         properties.validate();
         this.jobs = jobs; this.fragments = fragments; this.metadata = metadata; this.media = media; this.properties = properties;
+        this.deletions=deletions;
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
@@ -54,7 +56,10 @@ public class MediaJobStore {
     @Transactional
     public boolean checkpoint(MediaLease lease, MediaKind kind, StoredMedia uploaded) {
         var record = StoredMediaRecord.from(lease, kind, uploaded);
-        if (jobs.lockValid(lease) == null) return false;
+        if (jobs.lockValid(lease) == null) {
+            // The object may have arrived after deletion. Re-open its owned prefix cleanup, never delete shared live keys here.
+            deletions.rescanLateUpload(lease.userId(),lease.fragmentId());return false;
+        }
         var previous = media.find(lease.fragmentId(), lease.userId(), kind);
         if (previous != null) {
             if (!previous.equals(record)) throw new IllegalStateException("Media checkpoint already contains different content");

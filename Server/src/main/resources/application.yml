@@ -75,6 +75,12 @@ fragpicker:
       max-attempts: ${KNOWLEDGE_MAX_ATTEMPTS:3}
       retry-base-delay: ${KNOWLEDGE_RETRY_BASE_DELAY:10s}
   ingestion:
+    cleanup-worker:
+      enabled: ${MEDIA_CLEANUP_ENABLED:${OSS_ENABLED:false}}
+      poll-delay: ${MEDIA_CLEANUP_POLL_DELAY:5s}
+      lease-duration: ${MEDIA_CLEANUP_LEASE_DURATION:10m}
+      rescan-delay: ${MEDIA_CLEANUP_RESCAN_DELAY:24h}
+      retry-base-delay: ${MEDIA_CLEANUP_RETRY_BASE_DELAY:5m}
     transcription-worker:
       enabled: ${TRANSCRIPTION_WORKER_ENABLED:false}
       poll-delay: ${TRANSCRIPTION_POLL_DELAY:2s}

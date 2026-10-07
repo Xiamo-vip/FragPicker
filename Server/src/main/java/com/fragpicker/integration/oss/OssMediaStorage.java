@@ -81,6 +81,65 @@ public class OssMediaStorage {
         catch (ClientException failure) { throw new OssStorageFailure(UNAVAILABLE, true); }
     }
 
+    /** Internal durable deletion only; bucket was copied from owned records/config, never from HTTP input. */
+    public boolean deleteOwnedPage(String bucket,long userId,long fragmentId,java.util.function.BooleanSupplier renew) {
+        if(bucket==null || !bucket.matches("[a-z0-9][a-z0-9-]{1,61}[a-z0-9]"))throw new IllegalArgumentException("Invalid cleanup bucket");
+        prefix(userId,fragmentId,MediaKind.VIDEO);
+        String scope="users/"+userId+"/fragments/"+fragmentId+"/";
+        try {
+            if(!renew.getAsBoolean())return false;
+            var versioning=client.getBucketVersioning(bucket);
+            if(versioning==null)throw new OssStorageFailure(PROVIDER_REJECTED,true);
+            if(BucketVersioningConfiguration.ENABLED.equals(versioning.getStatus()) || BucketVersioningConfiguration.SUSPENDED.equals(versioning.getStatus()))
+                return deleteOwnedVersionPage(bucket,scope,renew);
+            if(versioning.getStatus()!=null && !BucketVersioningConfiguration.OFF.equals(versioning.getStatus()))throw new OssStorageFailure(PROVIDER_REJECTED,false);
+            if(!renew.getAsBoolean())return false;
+            var request=new ListObjectsV2Request(bucket).withPrefix(scope).withMaxKeys(100);
+            var page=client.listObjectsV2(request);
+            if(page==null || !bucket.equals(page.getBucketName()) || !scope.equals(page.getPrefix()))throw new OssStorageFailure(PROVIDER_REJECTED,false);
+            var keys=page.getObjectSummaries().stream().map(OSSObjectSummary::getKey).toList();
+            // Validate the entire page before issuing a delete, even if the provider response is malformed.
+            for(String key:keys) {
+                if(key==null || !key.startsWith(scope) || !key.substring(scope.length()).matches("(video|cover)/[a-f0-9]{64}"))
+                    throw new OssStorageFailure(PROVIDER_REJECTED,false);
+            }
+            if(keys.isEmpty())return !page.isTruncated();
+            if(keys.size()>100 || keys.stream().distinct().count()!=keys.size())throw new OssStorageFailure(PROVIDER_REJECTED,false);
+            if(!renew.getAsBoolean())return false;
+            var result=client.deleteObjects(new DeleteObjectsRequest(bucket).withKeys(keys).withQuiet(false));
+            if(result==null || result.getDeletedObjects()==null || !new HashSet<>(result.getDeletedObjects()).equals(new HashSet<>(keys)))
+                throw new OssStorageFailure(PROVIDER_REJECTED,true);
+            // Confirm with a fresh list on the next bounded pass; tokens can move while deleting keys.
+            return false;
+        } catch(OSSException error) {throw mapped(error);}
+        catch(ClientException error) {throw new OssStorageFailure(UNAVAILABLE,true);}
+    }
+
+    private record ObjectVersion(String key,String version) { }
+    private boolean deleteOwnedVersionPage(String bucket,String scope,java.util.function.BooleanSupplier renew) {
+        if(!renew.getAsBoolean())return false;
+        var page=client.listVersions(new ListVersionsRequest().withBucketName(bucket).withPrefix(scope).withMaxResults(100));
+        if(page==null || !bucket.equals(page.getBucketName()) || !scope.equals(page.getPrefix()))throw new OssStorageFailure(PROVIDER_REJECTED,false);
+        var keys=new ArrayList<DeleteVersionsRequest.KeyVersion>();var expected=new HashSet<ObjectVersion>();
+        for(var object:page.getVersionSummaries()) {
+            var key=object.getKey();var version=object.getVersionId();
+            if(key==null || !key.startsWith(scope) || !key.substring(scope.length()).matches("(video|cover)/[a-f0-9]{64}")
+                || version==null || version.isBlank() || version.length()>1024 || version.codePoints().anyMatch(cp->Character.isISOControl(cp)||Character.isWhitespace(cp)))
+                throw new OssStorageFailure(PROVIDER_REJECTED,false);
+            if(!expected.add(new ObjectVersion(key,version)))throw new OssStorageFailure(PROVIDER_REJECTED,false);
+            keys.add(new DeleteVersionsRequest.KeyVersion(key,version));
+        }
+        if(keys.isEmpty())return !page.isTruncated();
+        if(keys.size()>100)throw new OssStorageFailure(PROVIDER_REJECTED,false);
+        if(!renew.getAsBoolean())return false;
+        var result=client.deleteVersions(new DeleteVersionsRequest(bucket).withKeys(keys).withQuiet(false));
+        if(result==null || result.getDeletedVersions()==null)throw new OssStorageFailure(PROVIDER_REJECTED,true);
+        var acknowledged=new HashSet<ObjectVersion>();
+        for(var deleted:result.getDeletedVersions())acknowledged.add(new ObjectVersion(deleted.getKey(),deleted.getVersionId()!=null?deleted.getVersionId():deleted.getDeleteMarkerVersionId()));
+        if(!acknowledged.equals(expected))throw new OssStorageFailure(PROVIDER_REJECTED,true);
+        return false;
+    }
+
     private String prefix(long userId, long fragmentId, MediaKind kind) {
         if (userId <= 0 || fragmentId <= 0 || kind == null) throw new IllegalArgumentException("Invalid media owner or kind");
         return "users/" + userId + "/fragments/" + fragmentId + "/" + kind.segment() + "/";

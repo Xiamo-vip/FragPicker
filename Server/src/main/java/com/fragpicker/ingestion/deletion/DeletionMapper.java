@@ -39,4 +39,10 @@ public interface DeletionMapper {
     long dayTotal(@Param("owner") long owner,@Param("date") LocalDate date);
     @Delete("DELETE FROM daily_digests WHERE id=#{digest} AND user_id=#{owner}")
     int removeEmptyDigest(@Param("owner") long owner,@Param("digest") long digest);
+    @Update("""
+        UPDATE fragment_deletions SET status='QUEUED',version=version+1,next_scan_at=UTC_TIMESTAMP(3),
+          lease_owner=NULL,lease_expires_at=NULL,error_code=NULL
+        WHERE fragment_id=#{fragment} AND user_id=#{owner}
+        """)
+    int rescanLateUpload(@Param("owner") long owner,@Param("fragment") long fragment);
 }
