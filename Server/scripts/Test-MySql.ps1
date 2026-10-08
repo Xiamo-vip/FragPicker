@@ -1,5 +1,5 @@
 param([string]$MySqlBin, [switch]$AndroidAuth, [int]$HttpPort = 0, [switch]$Gradle, [switch]$AndroidChatLive, [switch]$AndroidKnowledgeFixture, [switch]$AndroidDigestLive,
-    [string]$AndroidGradleInitScript, [string]$AndroidTestClass, [switch]$AndroidRetryFixture)
+    [string]$AndroidGradleInitScript, [string]$AndroidTestClass, [switch]$AndroidRetryFixture, [switch]$AndroidPreviewFixture)
 
 $ErrorActionPreference = 'Stop'
 if ($AndroidChatLive -and (-not $AndroidAuth -or [string]::IsNullOrWhiteSpace($env:AI_CHAT_API_KEY))) {
@@ -7,6 +7,9 @@ if ($AndroidChatLive -and (-not $AndroidAuth -or [string]::IsNullOrWhiteSpace($e
 }
 if ($AndroidKnowledgeFixture -and -not $AndroidAuth) { throw 'AndroidKnowledgeFixture requires AndroidAuth' }
 if ($AndroidRetryFixture -and -not $AndroidAuth) { throw 'AndroidRetryFixture requires AndroidAuth' }
+if ($AndroidPreviewFixture -and (-not $AndroidAuth -or $Gradle -or $AndroidChatLive -or $AndroidDigestLive)) {
+    throw 'AndroidPreviewFixture requires AndroidAuth, Maven test classes and disabled live cloud services'
+}
 if ($AndroidDigestLive -and (-not $AndroidChatLive -or -not $AndroidKnowledgeFixture)) { throw 'AndroidDigestLive requires AndroidChatLive and AndroidKnowledgeFixture' }
 if (-not $MySqlBin) {
     $MySqlBin = Split-Path (Get-Command mysqld.exe -ErrorAction Stop).Source
@@ -29,7 +32,7 @@ $testServiceFlags = @('AI_CHAT_ENABLED','PARSEVIDEO_ENABLED','OSS_ENABLED','TING
     'MEDIA_WORKER_ENABLED','TRANSCRIPTION_WORKER_ENABLED','MEDIA_CLEANUP_ENABLED','KNOWLEDGE_ENRICHMENT_ENABLED',
     'KNOWLEDGE_INDEX_ENABLED','DIGEST_WORKER_ENABLED','DIGEST_SCHEDULE_ENABLED')
 foreach ($name in (@('DB_TEST_URL','DB_TEST_USERNAME','DB_TEST_PASSWORD','MYSQL_PWD','JWT_SIGNING_KEY',
-        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','ANDROID_KNOWLEDGE_FIXTURE','ANDROID_RETRY_FIXTURE') + $testServiceFlags)) {
+        'DB_URL','DB_USERNAME','DB_PASSWORD','SERVER_PORT','ANDROID_KNOWLEDGE_FIXTURE','ANDROID_RETRY_FIXTURE','ANDROID_PREVIEW_FIXTURE') + $testServiceFlags)) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 $testProcess = $null
@@ -61,6 +64,7 @@ try {
     $env:JWT_SIGNING_KEY = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
     $env:ANDROID_KNOWLEDGE_FIXTURE = if ($AndroidKnowledgeFixture) { 'true' } else { 'false' }
     $env:ANDROID_RETRY_FIXTURE = if ($AndroidRetryFixture) { 'true' } else { 'false' }
+    $env:ANDROID_PREVIEW_FIXTURE = if ($AndroidPreviewFixture) { 'true' } else { 'false' }
     # Isolated verification uses explicit overrides, including the packaged Android test backend.
     foreach ($name in $testServiceFlags) { [Environment]::SetEnvironmentVariable($name,'false') }
     Write-Output "Running integration tests on isolated MySQL at localhost:$port. Existing MySQL service is untouched."
@@ -85,8 +89,14 @@ try {
         $jarDirectory = if ($Gradle) { 'build/libs' } else { 'target' }
         $jar = Join-Path $serverRoot "$jarDirectory/fragpicker-server-0.1.0-SNAPSHOT.jar"
         $javaExe = Join-Path $env:JAVA_HOME 'bin/java.exe'
-        $apiProcess = Start-Process -FilePath $javaExe -ArgumentList '-jar', "`"$jar`"",
-            '--spring.profiles.active=database', '--server.address=127.0.0.1' -WindowStyle Hidden -PassThru `
+        $javaArguments = @('-jar', "`"$jar`"")
+        if ($AndroidPreviewFixture) {
+            $javaArguments = @("-Dloader.path=$serverRoot/target/test-classes",
+                '-Dloader.main=com.fragpicker.PreviewDeviceBackend', '-cp', "`"$jar`"",
+                'org.springframework.boot.loader.launch.PropertiesLauncher')
+        }
+        $apiProcess = Start-Process -FilePath $javaExe -ArgumentList ($javaArguments + @(
+            '--spring.profiles.active=database', '--server.address=127.0.0.1')) -WindowStyle Hidden -PassThru `
             -RedirectStandardOutput (Join-Path $testRoot 'api-stdout.log') -RedirectStandardError (Join-Path $testRoot 'api-stderr.log')
         $healthy = $false
         for ($attempt=0; $attempt -lt 120; $attempt++) {
@@ -106,6 +116,7 @@ try {
         if ($AndroidTestClass) { $androidArguments += "-Pandroid.testInstrumentationRunnerArguments.class=$AndroidTestClass" }
         if ($AndroidChatLive) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.chatLive=true' }
         if ($AndroidKnowledgeFixture) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.knowledgeFixture=true' }
+        if ($AndroidPreviewFixture) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.previewFixture=true' }
         if ($AndroidRetryFixture) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.retryFixture=true' }
         if ($AndroidDigestLive) { $androidArguments += '-Pandroid.testInstrumentationRunnerArguments.digestLive=true' }
         & (Join-Path $workspaceRoot 'Android/gradlew.bat') @androidArguments

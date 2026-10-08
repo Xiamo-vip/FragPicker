@@ -670,3 +670,14 @@ V15 仅将没有索引、已保存增强摘要的 `FAILED / INDEX_INTERNAL_ERROR
 失败日志记录 READ_SOURCE / EMBED / SAVE_INDEX 阶段、异常类型链以及 SQLState/错误编号，不输出异常消息、SQL、链接或转写正文。原生库链接失败使用 `INDEX_MODEL_UNAVAILABLE`。线上两条失败内容已只读提取并在隔离 MySQL 中重放，真实本地模型可索引；这说明其内容有效，并不证明线上运行环境已经修复。部署后须确认模型启动成功及任务 READY。
 
 验证：25 项索引、迁移、配置及真实模型检查全部通过；可执行 Spring Boot JAR 在系统盘没有可用空间时，使用项目缓存成功输出 512 维真实向量。私人诊断内容仅留在忽略目录，未写入测试源码或提交。
+
+### 分享资源预览（2026-10-08）
+
+登录后可 POST /api/v1/fragments/preview，JSON 为 shareText（1–4096 字）。服务先提取唯一受支持的分享链接，再调用配置的 parsevideo，读取视频文件头确认 MP4/MOV、WebM 或 FLV。响应包含 sourceUrl、sourceHost、title、author、resourceAvailable 和 contentType，Cache-Control 为 no-store，不返回签名媒体地址。不写入投喂任务，不上传 OSS，不调用听悟或模型；用户确认后仍需调用正常投喂接口。
+
+预览跟随 PARSEVIDEO_ENABLED。解析连接/读取上限为3/12秒，资源连接/读取各4秒，总资源检测12秒；最多3次重定向且逐跳校验公网地址，最多读取32个应用字节，结束立即中止响应，避免忽略 Range 的服务下载整段视频。每账号20秒一次，全局最多2个预览。无效链接400、不可读资源422、解析故障502、超时504、限流429、未启用503；失败不会创建投喂记录。
+
+PREVIEW_LIVE_TEST_ENABLED=true 和 PARSEVIDEO_TEST_BASE_URL 可启用公开样例的真实资源验证。2026-10-08 配置的解析服务成功返回视频信息，资源检测因本机 DNS 将公网域名解析到 198.18.0.0/15 而拒绝；尚未确认真实资源可读，应在正常公网 DNS 的运行环境重测。
+
+Test-MySql.ps1 -AndroidAuth -AndroidPreviewFixture 提供可复现的设备测试：真实登录、HTTP 和独立 MySQL，只有外部解析和资源预览使用测试类夹具。该启动器不在生产 JAR 中，强制使用127.0.0.1的 fragpicker_test 库且关闭全部云服务；不能作为真实 parsevideo/OSS/听悟验证。
+验证：20项预览、资源HTTP契约、分享解析、限流和无云启动测试全部通过；测试启动器的实际Android登录/会话恢复验证通过，lint与打包成功。
