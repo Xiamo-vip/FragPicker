@@ -32,8 +32,13 @@ class FeedIntegrationTest {
         compose.onNodeWithTag("feed_share").performScrollTo().performTextInput("https://www.bilibili.com/video/BV1GJ411x7h7")
         compose.onNodeWithTag("feed_submit").performScrollTo().performClick()
         compose.waitUntil(30_000) { compose.onAllNodesWithTag("feed_result").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(15_000) { runCatching { compose.onNodeWithTag("feed_result").assertIsDisplayed() }.isSuccess }
+        val feedback = compose.onNodeWithTag("feed_result").fetchSemanticsNode().boundsInRoot
+        val form = compose.onNodeWithTag("feed_share").fetchSemanticsNode().boundsInRoot
+        assertTrue("Feedback appears above the form after submitting", feedback.top < form.top)
         compose.activityRule.scenario.recreate()
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("feed_result").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("feed_result").assertIsDisplayed()
         val application = compose.activity.application as FragPickerApplication
         val userId = runBlocking { application.authRepository.restore()!!.id }
         val api = JsonApi(application.authRepository, userId)

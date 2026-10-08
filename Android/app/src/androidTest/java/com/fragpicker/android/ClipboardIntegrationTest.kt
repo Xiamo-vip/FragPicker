@@ -75,6 +75,7 @@ class ClipboardIntegrationTest {
         savePreview()
         compose.onNodeWithTag("clipboard_confirm").performClick()
         compose.waitUntil(20_000) { compose.onAllNodesWithTag("feed_result").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("feed_result").assertIsDisplayed()
         compose.onNodeWithTag("nav_FEED").assertIsSelected()
         compose.onNodeWithTag("feed_share").assertTextContains("https://b23.tv/manualdraft", substring = true)
         compose.onNodeWithTag("feed_note").assertTextContains("手动备注", substring = true)

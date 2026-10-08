@@ -58,19 +58,36 @@ fun FeedRoute(api: JsonApi, user: UserProfile, onOpen: ((Long) -> Unit)? = null,
         confirmButton = { TextButton(onClick = { share = incomingText; note = ""; replaceDraft = false; onImported(incomingId) }) { Text("替换草稿") } },
         dismissButton = { TextButton(onClick = { replaceDraft = false; onImported(incomingId) }) { Text("保留草稿") } })
     val keyboard = LocalSoftwareKeyboardController.current
+    val scroll = rememberScrollState()
+    LaunchedEffect(state.sending, state.id, state.error) {
+        if (state.sending || state.id != null || state.error != null) scroll.animateScrollTo(0)
+    }
     Scaffold(containerColor = Color.Transparent, topBar = { TopAppBar(title = { Text("投喂") },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)) }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).padding(bottom = LocalNavigationInset.current).imePadding().verticalScroll(rememberScrollState())
+        Column(Modifier.fillMaxSize().padding(padding).padding(bottom = LocalNavigationInset.current).imePadding().verticalScroll(scroll)
             .padding(horizontal = 24.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Text("欢迎回来，${user.username}", style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("留住灵感，\n慢慢消化。", style = MaterialTheme.typography.headlineLarge)
-            Text("把视频分享链接交给这里，重点与知识会自动整理到你的个人空间。",
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (state.sending) ProcessingCard("sending", ProcessingVisual.WAITING, "正在提交", "正在确认后台是否已接收。")
+            state.id?.takeUnless { state.sending }?.let { id ->
+                val visual = when (state.status) { "READY" -> ProcessingVisual.COMPLETE; "FAILED" -> ProcessingVisual.FAILED; else -> ProcessingVisual.WAITING }
+                ProcessingCard(id.toString(), visual, when (visual) {
+                    ProcessingVisual.COMPLETE -> "已整理完成"
+                    ProcessingVisual.FAILED -> "处理未完成"
+                    else -> if (state.duplicate) "这条内容已在知识空间" else "后台已接收"
+                }, "${state.date} · ${phaseLabel(state.status)}\n处理可在后台继续，稍后也能从回顾页查看。",
+                    modifier = Modifier.testTag("feed_result"),
+                    actionLabel = if (onOpen != null) "查看内容" else null, action = onOpen?.let { { it(id) } })
+                TextButton(onClick = model::retryStatus) { Text("刷新处理状态") }
+                com.fragpicker.android.feature.retry.RetryPanel(api, id, model::retryStatus, state.status)
+                if (visual == ProcessingVisual.WAITING && onOpen != null) TextButton(onClick = { onOpen(id) }) { Text("查看内容") }
+            }
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("feed_error")) }
+            Text(if (state.id != null || state.sending) "继续收进灵感" else "留住值得记住的内容", style = MaterialTheme.typography.titleLarge)
+            if (state.id == null && !state.sending) Text("粘贴视频分享内容，自动整理重点与知识。",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             ElevatedCard(shape = MaterialTheme.shapes.extraLarge) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(share, { if (it.length <= 4096) share = it }, label = { Text("视频分享链接") },
-                        placeholder = { Text("支持粘贴链接或整段分享内容") }, minLines = 3, maxLines = 6,
+                        placeholder = { Text("支持粘贴链接或整段分享内容") }, minLines = 2, maxLines = 4,
                         enabled = !state.sending, modifier = Modifier.fillMaxWidth().testTag("feed_share"))
                     TextButton(onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -85,21 +102,6 @@ fun FeedRoute(api: JsonApi, user: UserProfile, onOpen: ((Long) -> Unit)? = null,
                     }
                 }
             }
-            if (state.sending) ProcessingCard("sending", ProcessingVisual.WAITING, "正在提交", "正在确认后台是否已接收。")
-            state.id?.let { id ->
-                val visual = when (state.status) { "READY" -> ProcessingVisual.COMPLETE; "FAILED" -> ProcessingVisual.FAILED; else -> ProcessingVisual.WAITING }
-                ProcessingCard(id.toString(), visual, when (visual) {
-                    ProcessingVisual.COMPLETE -> "已整理完成"
-                    ProcessingVisual.FAILED -> "处理未完成"
-                    else -> if (state.duplicate) "这条内容已在知识空间" else "后台已接收"
-                }, "${state.date} · ${phaseLabel(state.status)}\n处理可在后台继续，稍后也能从回顾页查看。",
-                    modifier = Modifier.testTag("feed_result"),
-                    actionLabel = if (onOpen != null) "查看内容" else null, action = onOpen?.let { { it(id) } })
-                TextButton(onClick = model::retryStatus) { Text("刷新处理状态") }
-                com.fragpicker.android.feature.retry.RetryPanel(api, id, model::retryStatus, state.status)
-                if (visual == ProcessingVisual.WAITING && onOpen != null) TextButton(onClick = { onOpen(id) }) { Text("查看内容") }
-            }
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("feed_error")) }
             Spacer(Modifier.height(16.dp))
         }
     }
