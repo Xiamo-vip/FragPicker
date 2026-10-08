@@ -38,6 +38,10 @@ public class ChatTurnEngine {
             用少量加粗突出关键信息，长回答才使用二级标题；避免宽表格和过多层级，代码使用带语言名的代码块。
             不用客套开场，不复述问题，不展示思考过程，不重复来源卡片中的长摘要。每段只表达一个重点。
             保持 [资料42] 这样的来源标记，数字必须来自工具结果；Markdown 排版不能改变引用规则。
+            findSavedKnowledge 返回的是搜索候选，不是应当全部展示的推荐。逐条核对标题、摘要和片段，只选择与用户当前请求直接有关的资料。
+            用户寻找一个指定视频时，找到明确匹配就只返回那个视频；不能用相近主题的其他视频凑数。无法明确匹配时简短说明并询问一个必要线索。
+            每个实际选中的视频都在正文中引用 [资料ID]，不引用、不罗列未选中的候选；普通回答、无关结果或没有找到时不要添加资料标记。
+            直接提供所选结果或答案，不汇报检索和筛选过程，不输出“其余结果未纳入”“其他候选不相关”等排除说明，也不介绍被排除的视频。
             """;
     private final ObjectProvider<StreamingChatModel> models;
     private final HistoryToolFactory tools;
@@ -65,13 +69,19 @@ public class ChatTurnEngine {
                 if (answer == null || response.finishReason() == FinishReason.LENGTH) throw failure(HttpStatus.BAD_GATEWAY, "CHAT_OUTPUT_INVALID");
                 if (!answer.hasToolExecutionRequests()) {
                     if (answer.text() == null || answer.text().isBlank() || answer.text().length() > MAX_ANSWER_UNITS) throw failure(HttpStatus.BAD_GATEWAY, "CHAT_OUTPUT_INVALID");
-                    var sourceIds = new HashSet<Long>(); for (var card : tool.cards()) sourceIds.add(card.fragmentId());
+                    var sourceCards = new LinkedHashMap<Long, com.fragpicker.knowledge.search.SearchResponse.Hit>();
+                    for (var card : tool.cards()) sourceCards.put(card.fragmentId(), card);
+                    var selectedIds = new LinkedHashSet<Long>();
                     var citations = CITATION.matcher(answer.text()); while (citations.find()) {
-                        try { if (!sourceIds.contains(Long.parseLong(citations.group(1)))) throw failure(HttpStatus.BAD_GATEWAY, "CHAT_CITATION_INVALID"); }
+                        try {
+                            long id = Long.parseLong(citations.group(1));
+                            if (!sourceCards.containsKey(id)) throw failure(HttpStatus.BAD_GATEWAY, "CHAT_CITATION_INVALID");
+                            selectedIds.add(id);
+                        }
                         catch (NumberFormatException invalid) { throw failure(HttpStatus.BAD_GATEWAY, "CHAT_CITATION_INVALID"); }
                     }
                     deliver(() -> listener.roundEnded(current, false)); check(cancellation, deadline);
-                    return new ChatTurnResult(answer.text(), tool.cards(), context.truncated(), round + 1, tool.calls());
+                    return new ChatTurnResult(answer.text(), selectedIds.stream().map(sourceCards::get).toList(), context.truncated(), round + 1, tool.calls());
                 }
                 var calls = answer.toolExecutionRequests();
                 if (!allowTools || calls.size() > 3 - tool.calls()) throw failure(HttpStatus.BAD_GATEWAY, "CHAT_TOOL_LIMIT");

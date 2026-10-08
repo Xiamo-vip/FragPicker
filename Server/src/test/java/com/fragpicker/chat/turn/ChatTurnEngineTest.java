@@ -41,7 +41,7 @@ class ChatTurnEngineTest {
         assertThat(chunks).containsExactly("这是", "回答"); assertThat(result.answer()).isEqualTo("这是回答"); assertThat(result.cards()).isEmpty(); assertThat(result.modelRounds()).isEqualTo(1);
         assertThat(request.get().messages()).extracting(ChatMessage::type).containsExactly(ChatMessageType.SYSTEM, ChatMessageType.USER, ChatMessageType.AI, ChatMessageType.USER);
         assertThat(request.get().toolSpecifications()).extracting(spec -> spec.name()).containsExactlyInAnyOrder(HistorySearchTool.NAME,HistorySearchTool.DIGEST_NAME);
-        assertThat(((SystemMessage)request.get().messages().getFirst()).text()).contains("北京时间今天是", "getDailyDigest", "Markdown 正文", "先直接给结论", "不复述问题");
+        assertThat(((SystemMessage)request.get().messages().getFirst()).text()).contains("北京时间今天是", "getDailyDigest", "Markdown 正文", "先直接给结论", "不复述问题", "搜索候选", "只返回那个视频", "不汇报检索和筛选过程");
         assertThat(result.toString()).doesNotContain("回答", "private-reasoning");
     }
     @Test void dispatchesOwnedToolAndKeepsOriginalReasoningForProviderContinuationAndTrustedCards() {
@@ -50,7 +50,7 @@ class ChatTurnEngineTest {
         var call = call("one"); var original = AiMessage.builder().thinking("needed-to-continue").toolExecutionRequests(List.of(call)).build();
         doAnswer(invocation -> {
             ChatRequest request = invocation.getArgument(0); messages.add(request); StreamingChatResponseHandler callback = invocation.getArgument(1);
-            if (index.getAndIncrement() == 0) complete(callback, original); else { emit(callback, "资料42"); complete(callback, AiMessage.from("资料42")); } return null;
+            if (index.getAndIncrement() == 0) complete(callback, original); else { emit(callback, "[资料42]"); complete(callback, AiMessage.from("[资料42]")); } return null;
         }).when(model).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
         var result = stream(List.of(), "找导数", new TurnCancellation(), new ChatTurnListener() { @Override public void roundEnded(int round, boolean intermediate) { endings.add(intermediate); } });
         assertThat(result.cards()).containsExactly(card); assertThat(result.toolCalls()).isEqualTo(1); assertThat(endings).containsExactly(true, false);
@@ -66,6 +66,31 @@ class ChatTurnEngineTest {
         assertThat(requests.getLast().toolSpecifications()).isNullOrEmpty(); verify(search, times(3)).search(eq(9L), any());
         doAnswer(invocation -> { complete(invocation.getArgument(1), AiMessage.from(call("1"), call("2"), call("3"), call("4"))); return null; }).when(model).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
         assertCode(() -> stream(List.of(), "查资料", new TurnCancellation(), new ChatTurnListener() { }), "CHAT_TOOL_LIMIT");
+    }
+    @Test void returnsOnlyTheRequestedCitedVideoInsteadOfAllSearchCandidates() {
+        var a = card(); var b = card(43); var c = card(44);
+        when(search.search(eq(9L), any())).thenReturn(new SearchResponse(List.of(b, a, c), 3));
+        finalAnswerAfterSearch("找到 A 视频：[资料42]，讲解导数的定义。");
+        var result = stream(List.of(), "帮我找 A 视频", new TurnCancellation(), new ChatTurnListener() { });
+        assertThat(result.cards()).containsExactly(a);
+        assertThat(result.answer()).doesNotContain("其余结果", "未纳入");
+    }
+    @Test void omitsAllCandidateCardsWhenAnswerFindsNoRelevantVideo() {
+        when(search.search(eq(9L), any())).thenReturn(new SearchResponse(List.of(card(), card(43)), 2));
+        finalAnswerAfterSearch("没有找到明确匹配的视频，可以补充作者或标题中的词吗？");
+        assertThat(stream(List.of(), "找 A 视频", new TurnCancellation(), new ChatTurnListener() { }).cards()).isEmpty();
+    }
+    @Test void selectsCitationsAcrossSearchesInAnswerOrderAndDeduplicatesThem() {
+        when(search.search(eq(9L), any())).thenReturn(new SearchResponse(List.of(card(), card(43)), 2), new SearchResponse(List.of(card(44)), 1));
+        var index = new AtomicInteger();
+        doAnswer(invocation -> {
+            StreamingChatResponseHandler callback = invocation.getArgument(1); int n = index.getAndIncrement();
+            if (n < 2) complete(callback, AiMessage.from(call("search-" + n)));
+            else complete(callback, AiMessage.from("先看 [资料44]，再看 [资料42]。[资料44] 可作练习。"));
+            return null;
+        }).when(model).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
+        assertThat(stream(List.of(), "找课程和练习", new TurnCancellation(), new ChatTurnListener() { }).cards())
+                .extracting(SearchResponse.Hit::fragmentId).containsExactly(44L, 42L);
     }
     @Test void refusesBrokenToolProtocolAndSupplierFailureWithoutExposingBodyOrRetrying() {
         doAnswer(invocation -> { complete(invocation.getArgument(1), AiMessage.from(call("same"), call("same"))); return null; }).when(model).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
@@ -121,7 +146,17 @@ class ChatTurnEngineTest {
     private void emit(StreamingChatResponseHandler callback, String... tokens) { for (String token : tokens) callback.onPartialResponse(new PartialResponse(token), new PartialResponseContext(handle)); }
     private void complete(StreamingChatResponseHandler callback, AiMessage message) { callback.onCompleteResponse(ChatResponse.builder().aiMessage(message).build()); }
     private ToolExecutionRequest call(String id) { return ToolExecutionRequest.builder().id(id).name(HistorySearchTool.NAME).arguments("{\"query\":\"导数\"}").build(); }
-    private SearchResponse.Hit card() { return new SearchResponse.Hit(42, "导数", "老师", LocalDate.of(2026,10,6), "摘要", List.of(), "/owned/video", "/owned/cover", .6, .6, false, new SearchResponse.Match(0, "TITLE", null, null, null, "导数")); }
+    private SearchResponse.Hit card() { return card(42); }
+    private SearchResponse.Hit card(long id) { return new SearchResponse.Hit(id, "导数", "老师", LocalDate.of(2026,10,6), "摘要", List.of(), "/owned/video", "/owned/cover", .6, .6, false, new SearchResponse.Match(0, "TITLE", null, null, null, "导数")); }
+    private void finalAnswerAfterSearch(String answer) {
+        var index = new AtomicInteger();
+        doAnswer(invocation -> {
+            StreamingChatResponseHandler callback = invocation.getArgument(1);
+            if (index.getAndIncrement() == 0) complete(callback, AiMessage.from(call("search")));
+            else { emit(callback, answer); complete(callback, AiMessage.from(answer)); }
+            return null;
+        }).when(model).chat(any(ChatRequest.class), any(StreamingChatResponseHandler.class));
+    }
     private void assertCode(Runnable operation, String code) { assertThatThrownBy(operation::run).isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.code()).isEqualTo(code)); }
     private static class FakeHandle implements StreamingHandle { private volatile boolean cancelled; @Override public void cancel() { cancelled = true; } @Override public boolean isCancelled() { return cancelled; } }
 }
