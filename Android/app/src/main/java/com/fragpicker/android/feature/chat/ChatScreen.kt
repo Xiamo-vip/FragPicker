@@ -78,7 +78,8 @@ fun ChatRoute(api: JsonApi, onOpen: (Long) -> Unit) {
                 if (state.storageError) TextButton(onClick = model::initialize) { Text("重新读取本机记录") }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(question, { if (it.length <= 4000 && it.codePointCount(0, it.length) <= 2000) question = it },
-                        label = { Text("想找回什么？") }, maxLines = 4, enabled = state.initialized && !state.busy && state.pending == null && !state.storageError,
+                        label = { Text("想找回什么？") }, textStyle = MaterialTheme.typography.bodyMedium,
+                        maxLines = 4, enabled = state.initialized && !state.busy && state.pending == null && !state.storageError,
                         modifier = Modifier.weight(1f).testTag("chat_question"))
                     FilledIconButton(enabled = state.initialized && !state.busy && state.pending == null && !state.storageError,
                         onClick = { keyboard?.hide(); model.send(question) }, modifier = Modifier.padding(top = 8.dp).testTag("chat_send")) { Icon(Icons.AutoMirrored.Rounded.Send, "发送") }
@@ -88,8 +89,8 @@ fun ChatRoute(api: JsonApi, onOpen: (Long) -> Unit) {
     }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("chat_messages"), state = list, contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (state.turns.isEmpty() && state.pending == null) item {
-                Text("和记忆聊一聊。", style = MaterialTheme.typography.headlineMedium)
-                Text("描述主题、时间或作者，让 AI 从你保存的内容中寻找线索。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("和记忆聊一聊。", style = MaterialTheme.typography.headlineSmall)
+                Text("描述主题、时间或作者，让 AI 从你保存的内容中寻找线索。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = { question = "请帮我找之前保存的数学资源里与导数有关的内容。" }) { Text("找找导数的学习资源") }
             }
             if (state.before != null) item { TextButton(onClick = { model.history() }, enabled = !state.historyLoading) { Text("更早的消息") } }
@@ -97,7 +98,7 @@ fun ChatRoute(api: JsonApi, onOpen: (Long) -> Unit) {
             items(state.turns, key = { it.getLong("turnId") }) { turn ->
                 Column(Modifier.testTag("chat_turn_${turn.getLong("turnId")}"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.large) {
-                        SelectionContainer { Text(turn.getString("question"), Modifier.padding(16.dp)) }
+                        SelectionContainer { Text(turn.getString("question"), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium) }
                     }
                     if (turn.getString("state") == "COMPLETED") {
                         MarkdownText(turn.optionalString("answer") ?: "回答已保存。", Modifier.testTag("chat_answer_${turn.getLong("turnId")}"))
@@ -114,7 +115,7 @@ fun ChatRoute(api: JsonApi, onOpen: (Long) -> Unit) {
             }
             state.pending?.let { pending -> item {
                 if (state.turns.none { it.getLong("turnId") == pending.turnId }) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.large) {
-                    Text(pending.question, Modifier.padding(16.dp))
+                    Text(pending.question, Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium)
                 }
                 if (state.streamText.isNotBlank()) MarkdownText(state.streamText, Modifier.testTag("chat_stream"))
             } }
