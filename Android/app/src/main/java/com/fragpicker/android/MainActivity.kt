@@ -39,6 +39,8 @@ import com.fragpicker.android.feature.history.HistoryRoute
 import com.fragpicker.android.feature.chat.ChatRoute
 
 class MainActivity : ComponentActivity() {
+    private val clipboardEntry = kotlinx.coroutines.flow.MutableStateFlow(0L)
+    private val clipboardFocus = kotlinx.coroutines.flow.MutableStateFlow(0L)
     private val shares: IncomingShareViewModel by viewModels()
     private val theme: ThemeViewModel by viewModels {
         viewModelFactory { initializer { ThemeViewModel(ThemeRepository(applicationContext)) } }
@@ -56,6 +58,8 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) shares.accept(intent)
         enableEdgeToEdge()
         setContent {
+            val focusEpoch by clipboardFocus.collectAsStateWithLifecycle()
+            val entryEpoch by clipboardEntry.collectAsStateWithLifecycle()
             val mode by theme.mode.collectAsStateWithLifecycle()
             val account by login.state.collectAsStateWithLifecycle()
             val registrationState by registration.state.collectAsStateWithLifecycle()
@@ -67,6 +71,8 @@ class MainActivity : ComponentActivity() {
             FragmentsPickerTheme(mode) {
                 if (account.user != null) {
                     AppShell(account.user!!,
+                        overlay = { com.fragpicker.android.feature.clipboard.ClipboardRoute(
+                            JsonApi(authRepository, account.user!!.id), focusEpoch, entryEpoch, incomingShare != null) },
                         home = {
                             val navigate = com.fragpicker.android.core.ui.LocalOpenDestination.current
                             com.fragpicker.android.feature.home.HomeRoute(JsonApi(authRepository, account.user!!.id), account.user!!,
@@ -120,7 +126,14 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    override fun onStart() {
+        super.onStart(); clipboardEntry.value++
+    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) clipboardFocus.value++
+    }
     override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent); shares.accept(intent)
+        super.onNewIntent(intent); clipboardEntry.value++; shares.accept(intent)
     }
 }

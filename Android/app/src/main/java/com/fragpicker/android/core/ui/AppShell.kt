@@ -45,6 +45,7 @@ val LocalNavigationInset = staticCompositionLocalOf { 0.dp }
 
 @Composable
 fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
+             overlay: @Composable () -> Unit = {},
              openFeedRequest: String? = null,
              detail: (@Composable (Long, () -> Unit) -> Unit)? = null,
              home: @Composable () -> Unit = { Overview("首页", "今天，拾起了什么？", "欢迎回来，${user.username}") },
@@ -65,6 +66,7 @@ fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
     CompositionLocalProvider(LocalOpenDestination provides { detailId = null; destination = it }, LocalViewModelStoreOwner provides owner, LocalOpenFragment provides { detailId = it },
         LocalFragmentDeleted provides { detailId = null; destination = Destination.HISTORY },
         LocalNavigationInset provides if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) 100.dp else 0.dp) {
+        overlay()
         if (detailId != null && detail != null) {
             detail(detailId!!) { detailId = null }
         } else {

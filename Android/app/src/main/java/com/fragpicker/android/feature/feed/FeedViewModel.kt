@@ -46,11 +46,25 @@ class FeedViewModel(private val api: JsonApi, private val preferences: SharedPre
         }
     }
 
+    private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == preferenceKey) viewModelScope.launch { adoptReceipt() }
+    }
+    init { preferences.registerOnSharedPreferenceChangeListener(preferenceListener) }
+    private fun adoptReceipt() {
+        val stored = preferences.getLong(preferenceKey, 0).takeIf { it > 0 }
+        if (!state.value.sending && stored != state.value.id) {
+            polling?.cancel(); polling = null; mutable.value = FeedState(id = stored)
+            if (observing) startPolling()
+        }
+    }
+    override fun onCleared() {
+        preferences.unregisterOnSharedPreferenceChangeListener(preferenceListener)
+        super.onCleared()
+    }
     fun resume() {
         observing = true
-        if (!state.value.sending && state.value.id != null && preferences.getLong(preferenceKey, 0) != state.value.id) {
-            polling?.cancel(); polling = null; mutable.value = FeedState()
-        }
+        adoptReceipt()
+
         startPolling()
     }
     private fun startPolling() {
