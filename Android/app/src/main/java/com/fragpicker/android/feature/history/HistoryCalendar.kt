@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.json.JSONObject
 import java.time.YearMonth
@@ -24,7 +25,7 @@ import java.time.YearMonth
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HistoryCalendar(month: YearMonth, date: String, days: Map<String, JSONObject>, loading: Boolean,
-                    onMonth: (YearMonth) -> Unit, onDate: (String) -> Unit, onToday: () -> Unit) {
+                    onMonth: (YearMonth) -> Unit, onDate: (String) -> Unit, onToday: () -> Unit, heading: String? = null) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var summaryOnly by rememberSaveable { mutableStateOf(false) }
     val selectDate by rememberUpdatedState(onDate)
@@ -34,18 +35,25 @@ fun HistoryCalendar(month: YearMonth, date: String, days: Map<String, JSONObject
                 .firstOrNull { it.value.optBoolean("hasSummary") }?.let { selectDate(it.key) }
         }
     }
-    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopEnd) {
         val cardWidth = maxWidth
+        if (heading != null && !expanded) Box(Modifier.fillMaxWidth().padding(end = 72.dp).heightIn(min = 56.dp), contentAlignment = Alignment.CenterStart) {
+            Text(heading, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag("history_heading"))
+        }
         val width by animateDpAsState(if (expanded) cardWidth else 56.dp, tween(320, easing = FastOutSlowInEasing), label = "calendar_width")
         val radius by animateDpAsState(if (expanded) 24.dp else 28.dp, tween(320), label = "calendar_radius")
         val shape = RoundedCornerShape(radius)
-        Surface(Modifier.width(width).clip(shape).animateContentSize(tween(300), alignment = Alignment.TopCenter).testTag("history_calendar"),
+        Surface(Modifier.width(width).clip(shape).animateContentSize(tween(300), alignment = Alignment.TopEnd).testTag("history_calendar"),
             shape = shape, color = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.primaryContainer,
             tonalElevation = 2.dp) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(56.dp).testTag("calendar_toggle")
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+                    if (heading != null && expanded) Text(heading, style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f).padding(start = 16.dp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(56.dp).testTag("calendar_toggle")
                     .semantics { stateDescription = if (expanded) "日历已展开" else "日历已收起" }) {
-                    Icon(Icons.Rounded.CalendarMonth, if (expanded) "收起日历" else "展开日历", tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Rounded.CalendarMonth, if (expanded) "收起日历" else "展开日历", tint = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 AnimatedVisibility(expanded, enter = expandVertically(expandFrom = Alignment.Top, animationSpec = tween(300)) + fadeIn(tween(220, 90)),
                     exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(250)) + fadeOut(tween(150))) {

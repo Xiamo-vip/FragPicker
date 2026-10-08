@@ -54,11 +54,11 @@ fun HistoryRoute(api: JsonApi, onOpen: (Long) -> Unit) {
         LazyColumn(Modifier.fillMaxSize().padding(padding).padding(bottom = LocalNavigationInset.current).testTag("history_list")
             .semantics { stateDescription = if (state.loading) "正在加载资料" else "已加载${state.items.size}条" },
             contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item { Text("让知识在日历里生长。", style = MaterialTheme.typography.headlineSmall) }
             item {
                 HistoryCalendar(month, date, state.days, state.calendarLoading,
                     onMonth = { next -> monthText = next.toString(); date = next.atDay(1).toString() },
-                    onDate = { date = it }, onToday = { date = today.toString(); monthText = YearMonth.from(today).toString() })
+                    onDate = { date = it }, onToday = { date = today.toString(); monthText = YearMonth.from(today).toString() },
+                    heading = "让知识在日历里生长。")
             }
             state.calendarError?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
             item {

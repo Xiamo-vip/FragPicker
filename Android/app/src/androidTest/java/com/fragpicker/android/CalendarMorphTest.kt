@@ -22,15 +22,20 @@ class CalendarMorphTest {
         .put("total", if (number <= 3) 1 else 0).put("hasSummary", number == 1 || number == 3).put("summaryOutdated", number == 3) }
     @Test fun startsAsBallExpandsInPlaceAndCollapsesWithoutLeavingCalendarNodes() {
         compose.mainClock.autoAdvance = false
-        compose.setContent { FragmentsPickerTheme(ThemeMode.LIGHT) { HistoryCalendar(month, "2026-10-01", days(), false, {}, {}, {}) } }
+        compose.setContent { FragmentsPickerTheme(ThemeMode.LIGHT) { HistoryCalendar(month, "2026-10-01", days(), false, {}, {}, {}, heading = "让知识在日历里生长。") } }
         compose.mainClock.advanceTimeBy(32)
         val ball = compose.onNodeWithTag("history_calendar").fetchSemanticsNode().boundsInRoot
+        val heading = compose.onNodeWithTag("history_heading").fetchSemanticsNode().boundsInRoot
+        assertTrue("Calendar ball sits beside the heading", ball.left > heading.right)
+        assertEquals("Calendar ball shares the heading row", heading.center.y, ball.center.y, 2f)
         compose.onNodeWithTag("day_2026-10-01").assertDoesNotExist()
         compose.onNodeWithTag("calendar_toggle").performClick()
         compose.mainClock.advanceTimeBy(800)
         val card = compose.onNodeWithTag("history_calendar").fetchSemanticsNode().boundsInRoot
         assertTrue(card.width > ball.width * 3)
-        assertEquals("Expansion keeps the horizontal anchor", ball.center.x, card.center.x, 2f)
+        assertEquals("Expansion keeps the right anchor", ball.right, card.right, 2f)
+        val toggle = compose.onNodeWithTag("calendar_toggle").fetchSemanticsNode().boundsInRoot
+        assertEquals("Toggle stays at the original ball", ball.center.x, toggle.center.x, 2f)
         compose.onNodeWithTag("day_2026-10-02").assert(hasStateDescription("尚无总结"))
         compose.onNodeWithTag("calendar_toggle").performClick()
         compose.mainClock.advanceTimeBy(800)
@@ -57,7 +62,7 @@ class CalendarMorphTest {
     }
     private fun savePreview() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val values = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, "calendar-embers-preview.png"); put(MediaStore.Images.Media.MIME_TYPE, "image/png"); put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/FragPicker-QA") }
+        val values = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, "calendar-top-right-preview.png"); put(MediaStore.Images.Media.MIME_TYPE, "image/png"); put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/FragPicker-QA") }
         val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
         context.contentResolver.openOutputStream(uri)!!.use { compose.onNodeWithTag("history_calendar").captureToImage().asAndroidBitmap().compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
     }
