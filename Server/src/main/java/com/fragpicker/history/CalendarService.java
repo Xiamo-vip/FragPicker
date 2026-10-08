@@ -22,8 +22,9 @@ public class CalendarService {
         for (var day : calendar.month(owner, month.atDay(1), month.atEndOfMonth())) indexed.put(day.date(), day);
         var days = new ArrayList<CalendarResponse.Day>(month.lengthOfMonth()); long total = 0;
         for (int number = 1; number <= month.lengthOfMonth(); number++) {
-            var date = month.atDay(number); var count = indexed.getOrDefault(date, new CalendarMapper.DayCount(date, 0, 0, 0));
-            days.add(new CalendarResponse.Day(date, count.total(), count.ready(), count.total() - count.ready() - count.failed(), count.failed())); total += count.total();
+            var date = month.atDay(number); var count = indexed.getOrDefault(date, new CalendarMapper.DayCount(date, 0, 0, 0, false, false));
+            days.add(new CalendarResponse.Day(date, count.total(), count.ready(), count.total() - count.ready() - count.failed(), count.failed(),
+                    count.hasSummary(), count.hasSummary() && count.summaryOutdated())); total += count.total();
         }
         return new CalendarResponse(month.toString(), total, days);
     }

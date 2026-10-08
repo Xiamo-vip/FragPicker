@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.*;
 class CalendarIntegrationTest {
     private static final String SCHEMA = "fragpicker_calendar_" + UUID.randomUUID().toString().replace("-", "");
     @Autowired TestRestTemplate http; @Autowired JdbcTemplate jdbc; @Autowired SubmissionService submissions;
+    @Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     @Autowired com.fragpicker.digest.DigestScheduleStore digestChanges;
     @Autowired UserAccountMapper users; @Autowired FragmentRecordMapper fragments; @Autowired IngestionJobMapper jobs; @Autowired SubmissionRecordMapper requests; @Autowired ShareLinkResolver links; @Autowired PlatformTransactionManager transactions;
     private final List<Long> owned = new ArrayList<>();
@@ -48,6 +49,39 @@ class CalendarIntegrationTest {
         seed(owner, "2026-10-07", "READY"); seed(owner, "2026-09-30", "READY"); seed(owner, "2026-11-01", "READY"); seed(foreign, "2026-10-06", "READY");
         var body = get(owner, "?month=2026-10&userId=" + foreign.id()).getBody(); var day = body.path("days").get(5); assertThat(body.path("total").asLong()).isEqualTo(8); assertThat(day.path("total").asLong()).isEqualTo(7); assertThat(day.path("ready").asLong()).isEqualTo(1); assertThat(day.path("failed").asLong()).isEqualTo(1); assertThat(day.path("processing").asLong()).isEqualTo(5); assertThat(body.toString()).doesNotContain("userId", "sourceUrl", "note", "objectKey");
         assertThat(get(foreign, "?month=2026-10").getBody().path("total").asLong()).isEqualTo(1);
+    }
+    @Test void distinguishesPublishedPendingOutdatedAndInvalidatedSummariesWithoutLeakingOwners() throws Exception {
+        var owner = login(); var foreign = login();
+        var saved = seed(owner, "2026-10-06", "READY"); seed(owner, "2026-10-07", "READY");
+        var foreignSaved = seed(foreign, "2026-10-07", "READY");
+        long digest = publish(owner, saved, "2026-10-06"); publish(foreign, foreignSaved, "2026-10-07");
+        var days = get(owner, "?month=2026-10").getBody().path("days");
+        assertThat(days.get(5).path("hasSummary").asBoolean()).isTrue();
+        assertThat(days.get(5).path("summaryOutdated").asBoolean()).isFalse();
+        assertThat(days.get(6).path("hasSummary").asBoolean()).isFalse();
+        assertThat(days.get(0).path("hasSummary").asBoolean()).isFalse();
+        jdbc.update("UPDATE daily_digests SET status='FAILED', requested_revision=2 WHERE id=?", digest);
+        days = get(owner, "?month=2026-10").getBody().path("days");
+        assertThat(days.get(5).path("hasSummary").asBoolean()).as("Previous published result remains readable").isTrue();
+        assertThat(days.get(5).path("summaryOutdated").asBoolean()).isTrue();
+        jdbc.update("DELETE FROM daily_digest_sources WHERE digest_id=?", digest);
+        days = get(owner, "?month=2026-10").getBody().path("days");
+        assertThat(days.get(5).path("hasSummary").asBoolean()).as("A deleted source invalidates the summary").isFalse();
+        assertThat(days.get(5).path("summaryOutdated").asBoolean()).isFalse();
+    }
+    private long publish(Account owner, SubmissionResponse fragment, String rawDate) throws Exception {
+        var date = LocalDate.parse(rawDate);
+        var piece = new com.fragpicker.digest.DigestPiece(owner.id(), date, 1, 1, "一天的收获",
+            List.of(new com.fragpicker.digest.DigestPoint("学习变化率", List.of(fragment.fragmentId()))),
+            List.of(com.fragpicker.knowledge.EnrichmentResult.Category.LEARNING), List.of("导数"));
+        jdbc.update("""
+            INSERT INTO daily_digests (user_id,business_date,status,completed_revision,result_json,source_count,
+                completed_source_hash,generated_at,next_run_at)
+            VALUES (?,?,'READY',1,?,1,REPEAT('a',64),UTC_TIMESTAMP(3),UTC_TIMESTAMP(3))
+            """, owner.id(), date, json.writeValueAsString(piece));
+        long id = jdbc.queryForObject("SELECT id FROM daily_digests WHERE user_id=? AND business_date=?", Long.class, owner.id(), date);
+        jdbc.update("INSERT INTO daily_digest_sources (digest_id,user_id,revision,fragment_id,source_json) VALUES (?,?,1,?,JSON_OBJECT('fragmentId',?))", id, owner.id(), fragment.fragmentId(), fragment.fragmentId());
+        return id;
     }
     @Test void realSubmissionClockPlacesShanghaiMidnightOnCorrectDayAndKeepsStoredDate() {
         var owner = login(); var before = submitAt(owner, "2026-10-31T15:59:59.999Z"); var after = submitAt(owner, "2026-10-31T16:00:00Z"); assertThat(before.businessDate()).isEqualTo(LocalDate.of(2026,10,31)); assertThat(after.businessDate()).isEqualTo(LocalDate.of(2026,11,1));
