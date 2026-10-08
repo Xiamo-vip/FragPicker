@@ -41,7 +41,7 @@ class ChatTurnEngineTest {
         assertThat(chunks).containsExactly("这是", "回答"); assertThat(result.answer()).isEqualTo("这是回答"); assertThat(result.cards()).isEmpty(); assertThat(result.modelRounds()).isEqualTo(1);
         assertThat(request.get().messages()).extracting(ChatMessage::type).containsExactly(ChatMessageType.SYSTEM, ChatMessageType.USER, ChatMessageType.AI, ChatMessageType.USER);
         assertThat(request.get().toolSpecifications()).extracting(spec -> spec.name()).containsExactlyInAnyOrder(HistorySearchTool.NAME,HistorySearchTool.DIGEST_NAME);
-        assertThat(((SystemMessage)request.get().messages().getFirst()).text()).contains("北京时间今天是", "getDailyDigest");
+        assertThat(((SystemMessage)request.get().messages().getFirst()).text()).contains("北京时间今天是", "getDailyDigest", "Markdown 正文", "先直接给结论", "不复述问题");
         assertThat(result.toString()).doesNotContain("回答", "private-reasoning");
     }
     @Test void dispatchesOwnedToolAndKeepsOriginalReasoningForProviderContinuationAndTrustedCards() {
