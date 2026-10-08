@@ -67,6 +67,13 @@ class MainActivity : ComponentActivity() {
             FragmentsPickerTheme(mode) {
                 if (account.user != null) {
                     AppShell(account.user!!,
+                        home = {
+                            val navigate = com.fragpicker.android.core.ui.LocalOpenDestination.current
+                            com.fragpicker.android.feature.home.HomeRoute(JsonApi(authRepository, account.user!!.id), account.user!!,
+                                { navigate(com.fragpicker.android.core.ui.Destination.FEED) },
+                                { navigate(com.fragpicker.android.core.ui.Destination.CHAT) },
+                                { navigate(com.fragpicker.android.core.ui.Destination.HISTORY) }, LocalOpenFragment.current)
+                        },
                         openFeedRequest = incomingShare?.getString("id"),
                         detail = { id, back -> DetailRoute(JsonApi(authRepository, account.user!!.id), id, back,
                             com.fragpicker.android.core.ui.LocalFragmentDeleted.current) },

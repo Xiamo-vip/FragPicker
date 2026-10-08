@@ -24,6 +24,8 @@ class FeedIntegrationTest {
         compose.onNodeWithTag("login_username").performTextInput(username)
         compose.onNodeWithTag("login_password").performTextInput(password)
         compose.onNodeWithTag("login_submit").performScrollTo().performClick()
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("nav_FEED").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("nav_FEED").performClick()
         compose.waitUntil(30_000) { compose.onAllNodesWithTag("feed_submit").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("feed_submit").performScrollTo().performClick()
         compose.onNodeWithTag("feed_error").performScrollTo().assertIsDisplayed()

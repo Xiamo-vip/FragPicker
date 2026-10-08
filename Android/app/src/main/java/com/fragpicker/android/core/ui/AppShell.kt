@@ -34,10 +34,11 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 enum class Destination(val label: String, val icon: ImageVector) {
-    FEED("投喂", Icons.Rounded.AddLink), HISTORY("回顾", Icons.Rounded.CalendarMonth),
+    HOME("首页", Icons.Rounded.Home), FEED("投喂", Icons.Rounded.AddLink), HISTORY("回顾", Icons.Rounded.CalendarMonth),
     CHAT("对话", Icons.AutoMirrored.Rounded.Chat), SETTINGS("设置", Icons.Rounded.Settings)
 }
 
+val LocalOpenDestination = staticCompositionLocalOf<(Destination) -> Unit> { {} }
 val LocalOpenFragment = staticCompositionLocalOf<(Long) -> Unit> { {} }
 val LocalFragmentDeleted = staticCompositionLocalOf<() -> Unit> { {} }
 val LocalNavigationInset = staticCompositionLocalOf { 0.dp }
@@ -46,10 +47,11 @@ val LocalNavigationInset = staticCompositionLocalOf { 0.dp }
 fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
              openFeedRequest: String? = null,
              detail: (@Composable (Long, () -> Unit) -> Unit)? = null,
+             home: @Composable () -> Unit = { Overview("首页", "今天，拾起了什么？", "欢迎回来，${user.username}") },
              feed: @Composable () -> Unit = { Overview("投喂", "欢迎回来，${user.username}", "让值得记住的内容，在这里沉淀。") },
              history: @Composable () -> Unit = { Overview("回顾", "翻阅你的知识日历", "按日期找回曾经收藏的灵感。") },
              chat: @Composable () -> Unit = { Overview("对话", "和记忆聊一聊", "描述你要找的内容，连接零散的知识。") }) {
-    var destination by rememberSaveable { mutableStateOf(Destination.FEED) }
+    var destination by rememberSaveable { mutableStateOf(Destination.HOME) }
     var detailId by rememberSaveable { mutableStateOf<Long?>(null) }
     LaunchedEffect(openFeedRequest) { if (openFeedRequest != null) { detailId = null; destination = Destination.FEED } }
     val holder = rememberSaveableStateHolder()
@@ -57,10 +59,10 @@ fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
     val owner = remember(store) { object : ViewModelStoreOwner { override val viewModelStore = store } }
     DisposableEffect(store) { onDispose { store.clear() } }
     val backdrop = rememberLayerBackdrop()
-    BackHandler(enabled = detailId != null || destination != Destination.FEED) {
-        if (detailId != null) detailId = null else destination = Destination.FEED
+    BackHandler(enabled = detailId != null || destination != Destination.HOME) {
+        if (detailId != null) detailId = null else destination = Destination.HOME
     }
-    CompositionLocalProvider(LocalViewModelStoreOwner provides owner, LocalOpenFragment provides { detailId = it },
+    CompositionLocalProvider(LocalOpenDestination provides { detailId = null; destination = it }, LocalViewModelStoreOwner provides owner, LocalOpenFragment provides { detailId = it },
         LocalFragmentDeleted provides { detailId = null; destination = Destination.HISTORY },
         LocalNavigationInset provides if (WindowInsets.ime.getBottom(LocalDensity.current) == 0) 100.dp else 0.dp) {
         if (detailId != null && detail != null) {
@@ -71,6 +73,7 @@ fun AppShell(user: UserProfile, settings: @Composable () -> Unit,
                 Crossfade(destination, label = "page") { page ->
                     holder.SaveableStateProvider(page.name) {
                         when (page) {
+                            Destination.HOME -> home()
                             Destination.FEED -> feed()
                             Destination.HISTORY -> history()
                             Destination.CHAT -> chat()

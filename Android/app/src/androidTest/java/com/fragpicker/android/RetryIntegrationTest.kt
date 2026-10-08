@@ -33,6 +33,8 @@ class RetryIntegrationTest {
     private fun restoreFeed(api: JsonApi, id: Long) {
         compose.activity.getSharedPreferences("feed_last", Context.MODE_PRIVATE).edit().putLong("${api.baseUrl}:${api.userId}", id).commit()
         compose.activityRule.scenario.recreate()
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("nav_FEED").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("nav_FEED").performClick()
         compose.waitUntil(30_000) { compose.onAllNodesWithTag("feed_result").fetchSemanticsNodes().isNotEmpty() }
     }
     private fun store(api: JsonApi) = RetryRequestStore(compose.activity.getSharedPreferences("retry_requests", Context.MODE_PRIVATE), api.baseUrl, api.userId)

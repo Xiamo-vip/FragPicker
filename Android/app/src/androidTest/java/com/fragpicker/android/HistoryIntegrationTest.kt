@@ -25,7 +25,7 @@ class HistoryIntegrationTest {
         compose.onNodeWithTag("login_username").performTextInput(username)
         compose.onNodeWithTag("login_password").performTextInput(password)
         compose.onNodeWithTag("login_submit").performScrollTo().performClick()
-        compose.waitUntil(30_000) { compose.onAllNodesWithTag("feed_share").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("nav_HOME").fetchSemanticsNodes().isNotEmpty() }
         val app = compose.activity.application as FragPickerApplication
         val api = JsonApi(app.authRepository, runBlocking { app.authRepository.restore()!!.id })
         val ids = runBlocking { (0 until 23).map { index -> api.request("POST", "/api/v1/fragments",

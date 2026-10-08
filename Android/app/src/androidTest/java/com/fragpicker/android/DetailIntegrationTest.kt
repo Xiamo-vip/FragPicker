@@ -23,6 +23,8 @@ class DetailIntegrationTest {
         compose.onNodeWithTag("login_username").performTextInput(username)
         compose.onNodeWithTag("login_password").performTextInput(password)
         compose.onNodeWithTag("login_submit").performScrollTo().performClick()
+        compose.waitUntil(30_000) { compose.onAllNodesWithTag("nav_FEED").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("nav_FEED").performClick()
         compose.waitUntil(30_000) { compose.onAllNodesWithTag("feed_share").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("feed_share").performScrollTo().performTextInput("https://www.bilibili.com/video/BV1GJ411x7h7")
         compose.onNodeWithTag("feed_submit").performScrollTo().performClick()

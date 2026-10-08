@@ -26,7 +26,7 @@ class NavigationTest {
         compose.setContent { FragmentsPickerTheme(mode.value) {
             AppShell(user, settings = { SettingsScreen(mode.value, { mode.value = it }, LoginUiState(false, user), {}) })
         } }
-        compose.onNodeWithTag("nav_FEED").assertIsSelected()
+        compose.onNodeWithTag("nav_HOME").assertIsSelected()
         compose.onNodeWithTag("nav_HISTORY").performClick().assertIsSelected()
         compose.onNodeWithText("翻阅你的知识日历").assertIsDisplayed()
         compose.onNodeWithTag("nav_CHAT").performClick().assertIsSelected()
@@ -45,7 +45,7 @@ class NavigationTest {
                 AppShell(UserProfile(1, "navigation", "Asia/Shanghai"), settings = {})
             }
         } }
-        val first = compose.onNodeWithTag("nav_FEED").fetchSemanticsNode().boundsInRoot
+        val first = compose.onNodeWithTag("nav_HOME").fetchSemanticsNode().boundsInRoot
         val third = compose.onNodeWithTag("nav_CHAT").fetchSemanticsNode().boundsInRoot
         compose.onRoot().performTouchInput { swipe(first.center, third.center, 600) }
         compose.onNodeWithTag("nav_CHAT").assertIsSelected()
