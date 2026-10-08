@@ -38,7 +38,7 @@ class DatabaseMigrationTest {
     void migratesEmptyMySqlAndSecondMigrationIsNoOp() {
         assertThat(dataSource.getMaximumPoolSize()).isEqualTo(4);
         assertThat(dataSource.getMinimumIdle()).isZero();
-        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("14");
+        assertThat(flyway.info().current().getVersion().toString()).isEqualTo("15");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND table_name IN ('users', 'refresh_tokens')", Integer.class))

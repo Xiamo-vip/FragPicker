@@ -251,3 +251,5 @@ application.yml 只保存结构与环境变量引用；数据库凭据、JWT 密
 - [Android Material 3 官方文档](https://developer.android.google.cn/develop/ui/compose/designsystems/material3?hl=en)：用于主题、组件与动效设计依据。
 
 本规划中的应用架构、保留期限、交付顺序与检索策略均为针对本项目的建议方案，不是上述供应商文档对本项目的强制要求。
+
+- 2026-10-08：索引增加本地模型启动检查、独立原生运行缓存、纯不可见片段过滤和脱敏阶段诊断；V15 恢复保留增强结果的旧索引失败任务。真实线上内容只读重放成功，线上部署与 READY 状态仍需确认。

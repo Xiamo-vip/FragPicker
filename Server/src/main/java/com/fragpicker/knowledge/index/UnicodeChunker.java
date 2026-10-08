@@ -8,12 +8,12 @@ public class UnicodeChunker {
     public static final String VERSION = "unicode384-overlap48-v1";
     private static final int SIZE = LocalEmbeddingService.MAX_DOCUMENT_CODEPOINTS, OVERLAP = 48;
     public void append(IndexSource source, List<TextChunk> target, int maxChunks) {
-        if (source.content() == null || source.content().isBlank()) return;
+        if (source.content() == null || !searchable(source.content())) return;
         String text = source.content(); int from = 0, remaining = text.codePointCount(0, text.length());
         while (from < text.length()) {
             int to = text.offsetByCodePoints(from, Math.min(SIZE, remaining));
             String part = text.substring(from, to);
-            if (!part.isBlank()) {
+            if (searchable(part)) {
                 if (target.size() >= maxChunks) throw new IndexFailure("INDEX_TOO_LARGE", false);
                 target.add(new TextChunk(source.kind(), source.sourceOrdinal(), source.startMs(), source.endMs(), part));
             }
@@ -21,5 +21,10 @@ public class UnicodeChunker {
             from = text.offsetByCodePoints(to, -OVERLAP);
             remaining -= SIZE - OVERLAP;
         }
+    }
+    private boolean searchable(String text) {
+        return text.codePoints().anyMatch(cp -> !Character.isWhitespace(cp) && !Character.isSpaceChar(cp)
+                && !Character.isISOControl(cp) && Character.getType(cp) != Character.FORMAT
+                && Character.getType(cp) != Character.NON_SPACING_MARK && Character.getType(cp) != Character.ENCLOSING_MARK);
     }
 }

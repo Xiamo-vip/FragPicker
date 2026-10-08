@@ -9,6 +9,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 public class FragPickerApplication {
 
     public static void main(String[] args) {
+        com.fragpicker.knowledge.embedding.EmbeddingRuntime.prepare();
         SpringApplication.run(FragPickerApplication.class, args);
     }
 }

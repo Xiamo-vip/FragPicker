@@ -12,7 +12,11 @@ public class LocalEmbeddingService {
     public static final int MAX_DOCUMENT_CODEPOINTS = 384;
     public static final int MAX_QUERY_CODEPOINTS = 256;
     private static final String QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章：";
-    private final BgeSmallZhV15QuantizedEmbeddingModel model = new BgeSmallZhV15QuantizedEmbeddingModel();
+    private final BgeSmallZhV15QuantizedEmbeddingModel model;
+    public LocalEmbeddingService() {
+        EmbeddingRuntime.prepareNativeLibraries();
+        model = new BgeSmallZhV15QuantizedEmbeddingModel();
+    }
 
     public Embedding embedQuery(String query) {
         return infer(QUERY_PREFIX + checkedText(query, MAX_QUERY_CODEPOINTS));

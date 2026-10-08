@@ -85,6 +85,49 @@ class IndexIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT MAX(ordinal) FROM fragment_index_chunks WHERE fragment_id = ?", Integer.class, item.fragmentId()))
                 .isEqualTo(jdbc.queryForObject("SELECT chunk_count - 1 FROM fragment_indexes WHERE fragment_id = ?", Integer.class, item.fragmentId()));
     }
+    @Test void realModelIndexesTranscriptWithInvisibleFormattingOnlySegments() {
+        var item = pending("数学课程：导数表示函数的瞬时变化率。"); long owner = user(item);
+        knowledge.insertSentence(item.fragmentId(), owner, 0,
+                new TingwuResult.Sentence("0", null, 0, 0, 1000, "\u200B\uFEFF\u0000"));
+        knowledge.insertSentence(item.fragmentId(), owner, 1,
+                new TingwuResult.Sentence("0", null, 1, 1000, 2000, "利用极限和切线斜率理解导数。"));
+        assertThat(new IndexWorker(store, new LocalEmbeddingService()).runOnce()).isTrue();
+        assertThat(stage(item)).isEqualTo("READY");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM fragment_index_chunks WHERE fragment_id=? AND source_kind='TRANSCRIPT' AND source_ordinal=1 AND start_ms=1000 AND end_ms=2000", Integer.class, item.fragmentId())).isEqualTo(1);
+        assertThat(score(new LocalEmbeddingService().embedQuery("函数的变化率").vector(), item)).isGreaterThan(0.4);
+    }
+    @Test @EnabledIfEnvironmentVariable(named="INDEX_CONTEXT_FILE", matches=".+")
+    void indexesPrivateDiagnosticContextsWithoutPrintingContent() throws Exception {
+        var json = new com.fasterxml.jackson.databind.ObjectMapper();
+        for (String line : java.nio.file.Files.readAllLines(java.nio.file.Path.of(System.getenv("INDEX_CONTEXT_FILE")))) {
+            var data = json.readTree(line); var item = pending(data.path("summary").asText()); long owner = user(item);
+            jdbc.update("UPDATE fragments SET note=? WHERE id=?", data.path("note").isNull()?null:data.path("note").asText(), item.fragmentId());
+            jdbc.update("UPDATE fragment_knowledge SET enriched_summary=?,keywords=?,bullet_points=? WHERE fragment_id=?", data.path("enhanced").asText(),data.path("keywords").toString(),data.path("points").toString(),item.fragmentId());
+            jdbc.update("INSERT INTO fragment_video_metadata(fragment_id,user_id,title,author_name,video_url,parsed_at) VALUES(?,?,?,?,?,UTC_TIMESTAMP(3))",item.fragmentId(),owner,data.path("title").asText(),data.path("author").asText(),"https://example.com/fixture.mp4");
+            int ordinal=0;
+            for (var sentence:data.path("sentences")) knowledge.insertSentence(item.fragmentId(),owner,ordinal,
+                new TingwuResult.Sentence("0",null,ordinal++,sentence.path("start").asLong(),sentence.path("end").asLong(),sentence.path("text").asText()));
+            ordinal=0;
+            for (var point:data.path("keyPoints")) knowledge.insertPoint(item.fragmentId(),owner,ordinal,
+                new TingwuResult.KeyPoint(ordinal++,point.path("start").asLong(),point.path("end").asLong(),point.path("text").asText()));
+            assertThat(new IndexWorker(store,new LocalEmbeddingService()).runOnce()).isTrue();
+            assertThat(stage(item)).isEqualTo("READY");
+        }
+    }
+    @Test void recoveryMigrationOnlyRequeuesFailedLocalWorkAndPreservesPaidCheckpoints() throws Exception {
+        var failed=pending("索引恢复"); var unrelated=pending("其他失败");
+        jdbc.update("UPDATE ingestion_jobs SET stage='FAILED',error_code='INDEX_INTERNAL_ERROR',index_attempt_count=3 WHERE id=?",failed.jobId());
+        jdbc.update("UPDATE fragments SET status='FAILED' WHERE id=?",failed.fragmentId());
+        jdbc.update("UPDATE ingestion_jobs SET stage='FAILED',error_code='TINGWU_TASK_TIMEOUT' WHERE id=?",unrelated.jobId());
+        var bytes=getClass().getResourceAsStream("/db/migration/V15__recover_failed_local_indexes.sql").readAllBytes();
+        String sql=new String(bytes,java.nio.charset.StandardCharsets.UTF_8);
+        for(int pass=0;pass<2;pass++) for(String statement:sql.split(";")) if(!statement.isBlank()) jdbc.execute(statement);
+        assertThat(stage(failed)).isEqualTo("INDEX_PENDING"); assertThat(error(failed)).isNull();
+        assertThat(jdbc.queryForObject("SELECT index_attempt_count FROM ingestion_jobs WHERE id=?",Integer.class,failed.jobId())).isZero();
+        assertThat(jdbc.queryForObject("SELECT enriched_summary FROM fragment_knowledge WHERE fragment_id=?",String.class,failed.fragmentId())).isEqualTo("索引恢复");
+        assertThat(stage(unrelated)).isEqualTo("FAILED"); assertThat(error(unrelated)).isEqualTo("TINGWU_TASK_TIMEOUT");
+        new IndexWorker(store,embeddings).runOnce(); assertThat(stage(failed)).isEqualTo("READY");
+    }
     @Test void fencesOldOrForeignClaimsAndRenewalsAndRecoversExpiredLease() {
         var item = pending("导数课程"); var old = store.claim().orElseThrow(); expire(item); var next = store.claim().orElseThrow();
         assertThat(store.renew(old)).isFalse(); assertThat(store.complete(old, saved())).isFalse(); assertThat(store.fail(old, "INDEX_INTERNAL_ERROR", true)).isFalse();

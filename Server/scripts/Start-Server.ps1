@@ -67,7 +67,10 @@ try {
     $java = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin/java.exe' } else { (Get-Command java -ErrorAction Stop).Source }
     if (-not (Test-Path -LiteralPath $java)) { throw 'JAVA_HOME must point to JDK 21' }
     Write-Output 'Starting FragPicker with the database profile. Press Ctrl+C to stop.'
-    & $java '-jar' $resolvedJar '--spring.profiles.active=database'
+    $runtimeRoot = if ($env:INDEX_RUNTIME_DIRECTORY) { $env:INDEX_RUNTIME_DIRECTORY } else { Join-Path (Get-Location).Path '.fragpicker-runtime' }
+    $runtimeTemp = Join-Path $runtimeRoot 'tmp'
+    New-Item -ItemType Directory -Force -Path $runtimeTemp | Out-Null
+    & $java "-Djava.io.tmpdir=$runtimeTemp" '-jar' $resolvedJar '--spring.profiles.active=database'
     if ($LASTEXITCODE -ne 0) { throw "Server exited with code $LASTEXITCODE" }
 } finally {
     foreach ($name in $previous.Keys) { [Environment]::SetEnvironmentVariable($name, $previous[$name]) }

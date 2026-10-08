@@ -11,7 +11,10 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @ConditionalOnProperty(prefix = "fragpicker.knowledge.index", name = "enabled", havingValue = "true")
 public class IndexConfiguration {
     @Bean
-    IndexWorker indexWorker(IndexStore store, @Lazy LocalEmbeddingService embeddings, IndexProperties properties) {
-        properties.validate(); return new IndexWorker(store, embeddings);
+    IndexWorker indexWorker(IndexStore store, LocalEmbeddingService embeddings, IndexProperties properties) {
+        properties.validate();
+        // Load native libraries and run inference before accepting ingestion requests.
+        embeddings.embedDocument("索引服务启动检查");
+        return new IndexWorker(store, embeddings);
     }
 }

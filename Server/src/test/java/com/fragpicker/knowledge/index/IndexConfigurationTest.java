@@ -24,5 +24,19 @@ class IndexConfigurationTest {
         assertThatThrownBy(() -> new IndexProperties(true, Duration.ofSeconds(2), Duration.ofMinutes(10), 0, Duration.ofSeconds(10), 10000).validate()).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> new IndexProperties(true, Duration.ofSeconds(2), Duration.ofMinutes(10), 3, Duration.ofSeconds(10), 50001).validate()).isInstanceOf(IllegalStateException.class);
     }
+    @Test void refusesToStartAnEnabledWorkerWithAnUnavailableModel() {
+        var model=mock(LocalEmbeddingService.class);
+        when(model.embedDocument(anyString())).thenThrow(new IllegalStateException("fixture unavailable runtime"));
+        new ApplicationContextRunner().withUserConfiguration(IndexConfiguration.class)
+            .withPropertyValues("spring.profiles.active=database","fragpicker.knowledge.index.enabled=true","fragpicker.knowledge.index.poll-delay=1m")
+            .withBean(IndexStore.class,()->mock(IndexStore.class)).withBean(LocalEmbeddingService.class,()->model)
+            .withBean(IndexProperties.class,this::defaults)
+            .run(ctx->assertThat(ctx).hasFailed());
+        verify(model).embedDocument("索引服务启动检查");
+    }
+    @Test void diagnosisContainsTypesAndSqlCodesWithoutPrivateMessages() {
+        var failure=new IllegalStateException("private note",new java.sql.SQLException("private SQL", "22001",1406));
+        assertThat(IndexWorker.diagnosis(failure)).isEqualTo("IllegalStateException -> SQLException -> SQLState=22001, vendor=1406");
+    }
     private IndexProperties defaults() { return new IndexProperties(false, Duration.ofSeconds(2), Duration.ofMinutes(10), 3, Duration.ofSeconds(10), 10000); }
 }
