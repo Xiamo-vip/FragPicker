@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -58,36 +56,9 @@ fun HistoryRoute(api: JsonApi, onOpen: (Long) -> Unit) {
             contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { Text("让知识在日历里生长。", style = MaterialTheme.typography.headlineSmall) }
             item {
-                ElevatedCard(shape = MaterialTheme.shapes.extraLarge) {
-                    Column(Modifier.padding(12.dp)) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                            IconButton(enabled = month.year > 1000 || month.monthValue > 1, onClick = { monthText = month.minusMonths(1).toString(); date = month.minusMonths(1).atDay(1).toString() }) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "上个月") }
-                            Text("${month.year}年${month.monthValue}月", style = MaterialTheme.typography.titleMedium)
-                            IconButton(enabled = month.year < 9999 || month.monthValue < 12, onClick = { monthText = month.plusMonths(1).toString(); date = month.plusMonths(1).atDay(1).toString() }) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "下个月") }
-                        }
-                        Row { listOf("一", "二", "三", "四", "五", "六", "日").forEach { day -> Box(Modifier.weight(1f).height(36.dp), contentAlignment = Alignment.Center) { Text(day, style = MaterialTheme.typography.labelMedium) } } }
-                        val offset = month.atDay(1).dayOfWeek.value - 1
-                        repeat((offset + month.lengthOfMonth() + 6) / 7) { week -> Row(Modifier.fillMaxWidth()) {
-                            repeat(7) { weekday ->
-                                val number = week * 7 + weekday - offset + 1
-                                if (number in 1..month.lengthOfMonth()) {
-                                    val day = month.atDay(number).toString(); val count = state.days[day]?.optLong("total") ?: 0
-                                    val selected = day == date
-                                    TextButton(onClick = { date = day }, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("day_$day")
-                                        .semantics { contentDescription = "$day，${count}条投喂"; this.selected = selected },
-                                        contentPadding = PaddingValues(0.dp), colors = ButtonDefaults.textButtonColors(
-                                            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text(number.toString()); Text(if (count > 0) "•" else " ", style = MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
-                                } else Spacer(Modifier.weight(1f).height(52.dp))
-                            }
-                        } }
-                        TextButton(onClick = { date = today.toString(); monthText = YearMonth.from(today).toString() }, modifier = Modifier.align(Alignment.End)) { Text("回到今天") }
-                        if (state.calendarLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    }
-                }
+                HistoryCalendar(month, date, state.days, state.calendarLoading,
+                    onMonth = { next -> monthText = next.toString(); date = next.atDay(1).toString() },
+                    onDate = { date = it }, onToday = { date = today.toString(); monthText = YearMonth.from(today).toString() })
             }
             state.calendarError?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
             item {

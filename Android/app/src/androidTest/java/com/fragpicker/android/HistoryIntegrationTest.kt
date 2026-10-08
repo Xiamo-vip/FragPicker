@@ -46,6 +46,9 @@ class HistoryIntegrationTest {
         compose.onNodeWithTag("detail_page").performScrollToNode(hasText("日历测试 0"))
         compose.onNodeWithText("日历测试 0").assertIsDisplayed()
         compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithTag("history_list").performScrollToNode(hasTestTag("calendar_toggle"))
+        compose.onNodeWithTag("calendar_toggle").performClick()
+        compose.onNodeWithTag("day_${LocalDate.now(ZoneId.of("Asia/Shanghai"))}").assert(hasStateDescription("尚无总结"))
         compose.onNodeWithTag("history_list").performScrollToNode(hasContentDescription("上个月"))
         compose.onNodeWithContentDescription("上个月").performClick()
         compose.waitUntil(20_000) { compose.onAllNodes(hasTestTag("history_list") and hasStateDescription("已加载0条")).fetchSemanticsNodes().isNotEmpty() }
