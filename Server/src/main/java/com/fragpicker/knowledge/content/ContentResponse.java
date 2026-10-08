@@ -6,7 +6,8 @@ import java.util.List;
 
 public record ContentResponse(long id, String sourceUrl, String sourceHost, String note, LocalDate businessDate, String businessZone,
                               Instant createdAt, String status, String errorCode, String title, boolean titleTruncated, String author,
-                              boolean authorTruncated, String videoMediaPath, String coverMediaPath, long sentenceCount, long keyPointCount, Knowledge knowledge) {
+                              boolean authorTruncated, String videoMediaPath, String coverMediaPath, long sentenceCount, long keyPointCount, Knowledge knowledge,
+                              String displayTitle, String introduction) {
     public record Knowledge(long durationMs, String originalSummaryPreview, boolean originalSummaryTruncated, String summary, boolean summaryTruncated,
                             List<String> points, boolean pointsTruncated, List<String> keywords, boolean keywordsTruncated,
                             List<Category> categories, Instant completedAt, Instant enrichedAt) {

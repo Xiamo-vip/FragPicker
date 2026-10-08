@@ -34,7 +34,8 @@ public class ContentService {
         String media = "/api/v1/fragments/" + id + "/media?kind=";
         return new ContentResponse(header.id(), header.sourceUrl(), header.sourceHost(), header.note(), header.businessDate(), header.businessZone(), utc(header.createdAt()), header.status(), header.errorCode(),
                 header.title() == null || header.title().isBlank() ? "投喂记录" : header.title(), header.titleTruncated(), header.author(), header.authorTruncated(),
-                header.video() ? media + "VIDEO" : null, header.cover() ? media + "COVER" : null, header.sentenceCount(), header.keyPointCount(), knowledge);
+                header.video() ? media + "VIDEO" : null, header.cover() ? media + "COVER" : null, header.sentenceCount(), header.keyPointCount(), knowledge,
+                raw == null ? null : raw.displayTitle(), raw == null ? null : raw.introduction());
     }
     private Texts texts(String encoded, int limit, int maxLength) {
         if (encoded == null) return new Texts(List.of(), false);

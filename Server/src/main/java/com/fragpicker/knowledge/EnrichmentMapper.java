@@ -40,6 +40,7 @@ public interface EnrichmentMapper {
     List<String> samples(EnrichmentLease lease);
     @Update("""
             UPDATE fragment_knowledge SET enriched_summary = #{result.summary}, bullet_points = #{points}, categories = #{categories},
+                display_title = #{result.displayTitle}, introduction = #{result.introduction},
                 enrichment_model = #{model}, enriched_at = UTC_TIMESTAMP(3) WHERE fragment_id = #{lease.fragmentId} AND user_id = #{lease.userId}
             """)
     int save(@Param("lease") EnrichmentLease lease, @Param("result") EnrichmentResult result, @Param("points") String points,

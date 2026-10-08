@@ -52,18 +52,20 @@ class EnrichmentIntegrationTest {
     }
     @BeforeEach void model() {
         model = mock(ChatModel.class);
-        when(model.chat(any(ChatRequest.class))).thenReturn(ChatResponse.builder().aiMessage(AiMessage.from("{\"summary\":\"用导数理解函数变化。\",\"points\":[\"导数是变化率。\"],\"categories\":[\"LEARNING\"]}")).build());
+        when(model.chat(any(ChatRequest.class))).thenReturn(ChatResponse.builder().aiMessage(AiMessage.from("{\"summary\":\"用导数理解函数变化。\",\"points\":[\"导数是变化率。\"],\"categories\":[\"LEARNING\"],\"displayTitle\":\"用导数理解变化率\",\"introduction\":\"从切线理解函数的变化。\"}")).build());
     }
     @AfterEach void clean() { for (long id : owned) jdbc.update("DELETE FROM users WHERE id = ?", id); }
     @Test void atomicallyAddsEnrichmentPreservingOriginalTranscriptAndDoesNoIoInTransaction() {
         var item = pending();
         doAnswer(call -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-            return ChatResponse.builder().aiMessage(AiMessage.from("{\"summary\":\"用导数理解函数变化。\",\"points\":[\"导数是变化率。\"],\"categories\":[\"LEARNING\"]}")).build();
+            return ChatResponse.builder().aiMessage(AiMessage.from("{\"summary\":\"用导数理解函数变化。\",\"points\":[\"导数是变化率。\"],\"categories\":[\"LEARNING\"],\"displayTitle\":\"用导数理解变化率\",\"introduction\":\"从切线理解函数的变化。\"}")).build();
         }).when(model).chat(any(ChatRequest.class));
         assertThat(worker(model).runOnce()).isTrue(); assertThat(stage(item)).isEqualTo("INDEX_PENDING");
         assertThat(jdbc.queryForObject("SELECT summary FROM fragment_knowledge WHERE fragment_id = ?", String.class, item.fragmentId())).isEqualTo("导数描述变化率。可以通过切线理解函数。");
         assertThat(jdbc.queryForObject("SELECT categories FROM fragment_knowledge WHERE fragment_id = ?", String.class, item.fragmentId())).contains("LEARNING");
+        assertThat(jdbc.queryForObject("SELECT display_title FROM fragment_knowledge WHERE fragment_id = ?", String.class, item.fragmentId())).isEqualTo("用导数理解变化率");
+        assertThat(jdbc.queryForObject("SELECT introduction FROM fragment_knowledge WHERE fragment_id = ?", String.class, item.fragmentId())).isEqualTo("从切线理解函数的变化。");
         assertThat(jdbc.queryForObject("SELECT enriched_summary FROM fragment_knowledge WHERE fragment_id = ?", String.class, item.fragmentId())).contains("导数");
         assertThat(jdbc.queryForObject("SELECT start_ms FROM fragment_sentences WHERE fragment_id = ?", Long.class, item.fragmentId())).isEqualTo(1000);
         assertThat(worker(model).runOnce()).isFalse(); verify(model, times(1)).chat(any(ChatRequest.class));

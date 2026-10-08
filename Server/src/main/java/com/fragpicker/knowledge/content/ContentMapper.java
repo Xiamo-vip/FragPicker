@@ -20,7 +20,8 @@ public interface ContentMapper {
     @Select("""
             SELECT duration_ms, LEFT(summary, 4000) AS original_summary_preview, COALESCE(CHAR_LENGTH(summary) > 4000, FALSE) AS original_summary_truncated,
                 LEFT(enriched_summary, 2000) AS summary, COALESCE(CHAR_LENGTH(enriched_summary) > 2000, FALSE) AS summary_truncated,
-                CAST(bullet_points AS CHAR) AS points, CAST(keywords AS CHAR) AS keywords, CAST(categories AS CHAR) AS categories, completed_at, enriched_at
+                CAST(bullet_points AS CHAR) AS points, CAST(keywords AS CHAR) AS keywords, CAST(categories AS CHAR) AS categories, completed_at, enriched_at,
+                display_title, introduction
             FROM fragment_knowledge WHERE fragment_id = #{id} AND user_id = #{user}
             """)
     ContentKnowledge knowledge(@Param("user") long user, @Param("id") long id);

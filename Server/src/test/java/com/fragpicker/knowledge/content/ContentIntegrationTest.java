@@ -90,6 +90,18 @@ class ContentIntegrationTest {
         }
         assertThat(jdbc.queryForObject("SELECT summary FROM fragment_knowledge WHERE fragment_id = ?", String.class, item.fragmentId())).isEqualTo("原始资料");
     }
+    @Test void returnsConciseCopyWithoutReplacingSourceOrFullKnowledge() {
+        var owner = login(); var item = fragment(owner); fill(owner, item, "完整原始摘要");
+        jdbc.update("UPDATE fragment_knowledge SET display_title = '切线与导数', introduction = '从切线斜率掌握变化率。' WHERE fragment_id = ?", item.fragmentId());
+        var body = get(owner, item.fragmentId()).getBody();
+        assertThat(body.path("displayTitle").asText()).isEqualTo("切线与导数");
+        assertThat(body.path("introduction").asText()).isEqualTo("从切线斜率掌握变化率。");
+        assertThat(body.path("title").asText()).isEqualTo("导数课程");
+        assertThat(body.path("knowledge").path("summary").asText()).contains("增强摘要");
+        var daily = http.exchange("/api/v1/fragments?date=" + body.path("businessDate").asText(), HttpMethod.GET, new HttpEntity<>(headers(owner)), JsonNode.class);
+        assertThat(daily.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(daily.getBody().path("items").get(0).path("displayTitle").asText()).isEqualTo("切线与导数");
+    }
     private SubmissionResponse fragment(Account owner) { return submissions.submit(owner.id(), UUID.randomUUID().toString(), new SubmissionRequest("https://b23.tv/" + UUID.randomUUID() + "/", "学习数学")); }
     private void fill(Account owner, SubmissionResponse item, String original) {
         knowledge.insert(item.fragmentId(), owner.id(), 2000, original, "[\"导数\",\"变化率\"]");

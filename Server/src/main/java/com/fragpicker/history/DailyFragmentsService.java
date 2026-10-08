@@ -38,7 +38,8 @@ public class DailyFragmentsService {
         }
         return new DailyFragmentsResponse.Item(saved.id(), saved.businessDate(), saved.createdAt(), saved.sourceHost(), saved.status(), saved.errorCode(),
                 saved.title(), saved.titleTruncated(), saved.author(), saved.authorTruncated(), summary, origin, truncated,
-                knowledge == null ? List.of() : knowledge.categories(), "/api/v1/fragments/" + saved.id() + "/content", saved.videoMediaPath(), saved.coverMediaPath());
+                knowledge == null ? List.of() : knowledge.categories(), "/api/v1/fragments/" + saved.id() + "/content", saved.videoMediaPath(), saved.coverMediaPath(),
+                saved.displayTitle(), saved.introduction());
     }
     private ApiException invalid() { return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_HISTORY_PAGE", "请提供有效日期、正整数游标和1至20的页大小"); }
 }

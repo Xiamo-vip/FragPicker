@@ -34,8 +34,8 @@ public interface SearchMapper {
     List<SearchChunk> page(@Param("scope") SearchScope scope, @Param("model") String model, @Param("chunker") String chunker,
                            @Param("afterFragment") long afterFragment, @Param("afterOrdinal") int afterOrdinal, @Param("size") int size);
     @Select("""
-            <script>SELECT f.id AS fragment_id, LEFT(m.title, 500) AS title, LEFT(m.author_name, 100) AS author, f.business_date,
-                LEFT(COALESCE(k.enriched_summary, k.summary), 2000) AS summary, CAST(k.categories AS CHAR) AS categories,
+            <script>SELECT f.id AS fragment_id, LEFT(COALESCE(k.display_title, m.title), 500) AS title, LEFT(m.author_name, 100) AS author, f.business_date,
+                LEFT(COALESCE(k.introduction, k.enriched_summary, k.summary), 2000) AS summary, CAST(k.categories AS CHAR) AS categories,
                 EXISTS (SELECT 1 FROM fragment_stored_media v WHERE v.fragment_id = f.id AND v.user_id = f.user_id AND v.kind = 'VIDEO') AS video,
                 EXISTS (SELECT 1 FROM fragment_stored_media c WHERE c.fragment_id = f.id AND c.user_id = f.user_id AND c.kind = 'COVER') AS cover
             """ + FROM + FILTER + " AND f.id = #{id}</script>")
