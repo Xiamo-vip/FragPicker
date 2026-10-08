@@ -15,7 +15,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 
-class FlameBackgroundTest {
+class EmberBackgroundTest {
     @get:Rule val compose = createComposeRule()
     @Test fun defaultTextRemainsReadableOnTheDarkCanvas() {
         compose.setContent { FragmentsPickerTheme(ThemeMode.DARK) {
@@ -27,7 +27,7 @@ class FlameBackgroundTest {
             if (pixels[x,y].red > .7f && pixels[x,y].green > .7f && pixels[x,y].blue > .7f) bright++
         assertTrue(bright > 100)
     }
-    @Test fun sparseFlamesMoveWhileTheDarkCanvasStaysSolidAndThemeSwitchWorks() {
+    @Test fun sparseEmbersMoveWhileTheDarkCanvasStaysSolidAndThemeSwitchWorks() {
         compose.mainClock.autoAdvance = false
         val mode = mutableStateOf(ThemeMode.DARK)
         compose.setContent { FragmentsPickerTheme(mode.value) {
@@ -37,15 +37,16 @@ class FlameBackgroundTest {
         val first = compose.onNodeWithTag("background").captureToImage().toPixelMap()
         compose.mainClock.advanceTimeBy(2_000)
         val second = compose.onNodeWithTag("background").captureToImage().toPixelMap()
-        var base = 0; var flames = 0; var changed = 0
+        var base = 0; var embers = 0; var changed = 0
         for (y in 0 until second.height step 2) for (x in 0 until second.width step 2) {
             val pixel = second[x,y]
-            if (kotlin.math.abs(pixel.red - 20f/255) < .005f && kotlin.math.abs(pixel.green - 18f/255) < .005f && kotlin.math.abs(pixel.blue - 24f/255) < .005f) base++ else flames++
+            if (kotlin.math.abs(pixel.red - 20f/255) < .005f && kotlin.math.abs(pixel.green - 18f/255) < .005f && kotlin.math.abs(pixel.blue - 24f/255) < .005f) base++ else embers++
             if (first[x,y] != pixel) changed++
         }
-        assertTrue("Most of the canvas remains solid", base > flames * 30)
-        assertTrue("Warm flames actually render", flames > 0)
-        assertTrue("Flames float rather than staying static", changed > 10)
+        assertTrue("Most of the canvas remains solid", base > embers * 30)
+        assertTrue("Small warm embers actually render", embers > 0)
+        assertTrue("Embers remain tiny decorations", embers < base / 80)
+        assertTrue("Embers float rather than staying static", changed > 10)
         compose.runOnIdle { mode.value = ThemeMode.LIGHT }
         compose.mainClock.advanceTimeBy(400)
         val light = compose.onNodeWithTag("background").captureToImage().toPixelMap()

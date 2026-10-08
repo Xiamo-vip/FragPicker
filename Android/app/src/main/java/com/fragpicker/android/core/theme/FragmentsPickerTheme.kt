@@ -68,8 +68,8 @@ fun FragmentsPickerTheme(mode: ThemeMode, content: @Composable () -> Unit) {
             }
         }
     }
-    val flames = rememberFlameAnimation(dark)
-    CompositionLocalProvider(LocalDarkTheme provides dark, LocalFlameAnimation provides flames) {
+    val embers = rememberEmberAnimation(dark)
+    CompositionLocalProvider(LocalDarkTheme provides dark, LocalEmberAnimation provides embers) {
         MaterialTheme(colorScheme = if (dark) DarkColors else LightColors) {
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                 Box(Modifier.fillMaxSize().appBackground()) { content() }

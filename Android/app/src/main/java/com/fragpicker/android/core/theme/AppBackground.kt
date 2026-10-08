@@ -9,8 +9,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -22,12 +21,12 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 val LocalDarkTheme = staticCompositionLocalOf { false }
-internal class FlameAnimation(val seconds: MutableFloatState, val seed: Long)
-internal val LocalFlameAnimation = staticCompositionLocalOf<FlameAnimation?> { null }
+internal class EmberAnimation(val seconds: MutableFloatState, val seed: Long)
+internal val LocalEmberAnimation = staticCompositionLocalOf<EmberAnimation?> { null }
 
 @Composable
-internal fun rememberFlameAnimation(active: Boolean): FlameAnimation {
-    val animation = remember { FlameAnimation(mutableFloatStateOf(0f), Random.nextLong()) }
+internal fun rememberEmberAnimation(active: Boolean): EmberAnimation {
+    val animation = remember { EmberAnimation(mutableFloatStateOf(0f), Random.nextLong()) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(active, lifecycle) {
         if (!active) return@LaunchedEffect
@@ -51,20 +50,13 @@ internal fun rememberFlameAnimation(active: Boolean): FlameAnimation {
 @Composable
 fun Modifier.appBackground(): Modifier {
     val dark = LocalDarkTheme.current
-    val animation = LocalFlameAnimation.current ?: rememberFlameAnimation(dark)
+    val animation = LocalEmberAnimation.current ?: rememberEmberAnimation(dark)
     val colors = MaterialTheme.colorScheme
     return drawWithCache {
         if (dark) {
             val random = Random(animation.seed)
-            val count = (size.width * size.height / (24_000f * density * density)).toInt().coerceIn(14, 42)
-            val particles = List(count) { FlameSlot(random.nextLong(), random.nextFloat() * 30f, 18f + random.nextFloat() * 20f) }
-            val flame = Path().apply {
-                moveTo(0f, -1.7f)
-                cubicTo(.2f, -.55f, 1.2f, -.25f, .85f, .65f)
-                cubicTo(.5f, 1.35f, -.65f, 1.2f, -.85f, .55f)
-                cubicTo(-1.1f, -.2f, -.35f, -.45f, 0f, -1.7f)
-                close()
-            }
+            val count = (size.width * size.height / (12_000f * density * density)).toInt().coerceIn(24, 64)
+            val particles = List(count) { EmberSlot(random.nextLong(), random.nextFloat() * 24f, 12f + random.nextFloat() * 18f) }
             onDrawBehind {
                 drawRect(colors.background)
                 val seconds = animation.seconds.floatValue
@@ -72,18 +64,22 @@ fun Modifier.appBackground(): Modifier {
                     val age = seconds + slot.offset
                     slot.respawn((age / slot.lifetime).toLong())
                     val progress = (age % slot.lifetime) / slot.lifetime
-                    val wave = sin(progress * 2f * PI.toFloat() + slot.phase)
-                    val x = slot.x * size.width + wave * slot.drift * density
-                    val y = size.height + 30f * density - progress * (size.height + 60f * density)
-                    val radius = slot.radius * density
-                    val alpha = sin(progress * PI.toFloat()).coerceAtLeast(0f) * slot.opacity
-                    drawCircle(Color(0xFFFFAC64).copy(alpha = alpha * .12f), radius * 2.4f, Offset(x, y))
-                    withTransform({ translate(x, y); scale(radius * (.9f + .1f * wave), radius, Offset.Zero) }) {
-                        drawPath(flame, Color(0xFFFF935C).copy(alpha = alpha))
-                        withTransform({ translate(0f, .35f); scale(.45f, .55f, Offset.Zero) }) {
-                            drawPath(flame, Color(0xFFFFDF9E).copy(alpha = alpha * 1.5f))
-                        }
-                    }
+                    val wave = sin(progress * 4f * PI.toFloat() + slot.phase)
+                    val turbulence = sin(progress * 9f * PI.toFloat() + slot.phase * 1.7f) * .22f
+                    val x = slot.x * size.width + (wave + turbulence) * slot.drift * density
+                    val travel = progress * .75f + progress * progress * .25f
+                    val y = size.height + 16f * density - travel * (size.height + 32f * density)
+                    val radius = slot.radius * density * (1f - progress * .45f)
+                    val flicker = .8f + .2f * sin(seconds * 3.1f + slot.phase)
+                    val alpha = sin(progress * PI.toFloat()).coerceAtLeast(0f) * slot.opacity * flicker
+                    val warm = if (slot.golden) Color(0xFFFFC978) else Color(0xFFFF794B)
+                    val center = Offset(x, y)
+                    drawCircle(warm.copy(alpha = alpha * .09f), radius * 3.5f, center)
+                    // A short fading trail follows the ember; there are no flame silhouettes.
+                    if (slot.trail) drawLine(warm.copy(alpha = alpha * .3f), center,
+                        Offset(x - wave * radius, y + radius * 4f), radius * .8f, StrokeCap.Round)
+                    drawCircle(warm.copy(alpha = alpha), radius, center)
+                    drawCircle(Color(0xFFFFE9BC).copy(alpha = alpha * .8f), radius * .4f, center)
                 }
             }
         } else {
@@ -93,17 +89,19 @@ fun Modifier.appBackground(): Modifier {
     }
 }
 
-private class FlameSlot(val seed: Long, val offset: Float, val lifetime: Float) {
+private class EmberSlot(val seed: Long, val offset: Float, val lifetime: Float) {
     private var cycle = Long.MIN_VALUE
     var x = 0f; var radius = 0f; var drift = 0f; var phase = 0f; var opacity = 0f
+    var golden = false; var trail = false
     fun respawn(generation: Long) {
         if (generation == cycle) return
         cycle = generation
         val random = Random(seed xor (generation * -7046029254386353131L))
         x = .03f + random.nextFloat() * .94f
-        radius = 2.5f + random.nextFloat() * 3.5f
-        drift = 8f + random.nextFloat() * 22f
+        radius = .55f + random.nextFloat() * 1.05f
+        drift = 8f + random.nextFloat() * 28f
         phase = random.nextFloat() * 2f * PI.toFloat()
-        opacity = .12f + random.nextFloat() * .16f
+        opacity = .25f + random.nextFloat() * .3f
+        golden = random.nextBoolean(); trail = random.nextFloat() < .3f
     }
 }
