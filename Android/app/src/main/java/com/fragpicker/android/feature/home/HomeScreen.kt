@@ -104,19 +104,10 @@ fun HomeScreen(api: JsonApi, user: UserProfile, state: HomeState, onRefresh: () 
                             Text("今日知识小结", style = MaterialTheme.typography.titleLarge)
                         }
                         if (result != null) {
-                            Text(result.getString("summary"), style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.testTag("home_summary"), maxLines = 7, overflow = TextOverflow.Ellipsis)
+                            DailyDigestBody(result, summaryTag = "home_summary", compact = true)
+                            HorizontalDivider()
+                            Text("已归纳${result.optLong("sourceCount")}条内容", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (digest.optBoolean("outdated")) Text("新内容还在补齐，这里显示最近一次总结。", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                            result.optJSONArray("points")?.objects()?.take(3)?.forEachIndexed { index, point ->
-                                Text("${index + 1}. ${point.getString("text")}", style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                (result.optJSONArray("categories")?.strings().orEmpty().map(::categoryLabel) + result.optJSONArray("keywords")?.strings().orEmpty()).distinct().take(6).forEach { word ->
-                                    Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
-                                        Text(word, Modifier.padding(horizontal = 9.dp, vertical = 5.dp), style = MaterialTheme.typography.labelMedium)
-                                    }
-                                }
-                            }
                         } else {
                             Text(when (digest?.optString("status")) {
                                 "EMPTY" -> "今天还没有投喂。收藏一个值得记住的片段，让灵感慢慢沉淀。"

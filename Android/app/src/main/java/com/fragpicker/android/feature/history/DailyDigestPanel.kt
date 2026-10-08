@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.fragpicker.android.core.network.*
+import com.fragpicker.android.core.ui.DailyDigestBody
 import java.time.*
 import java.time.format.DateTimeFormatter
 
@@ -24,7 +25,7 @@ fun DailyDigestPanel(state: HistoryState, sourcesVisible: Boolean, onSources: ()
     ElevatedCard(Modifier.fillMaxWidth().testTag("digest_card").semantics {
         stateDescription = "状态 ${status ?: "LOADING"} · 第${digest?.optLong("completedRevision") ?: 0}版"
     }, shape = MaterialTheme.shapes.extraLarge) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                 Text("当天总结", style = MaterialTheme.typography.titleLarge)
@@ -38,22 +39,14 @@ fun DailyDigestPanel(state: HistoryState, sourcesVisible: Boolean, onSources: ()
             }, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (status in listOf("QUEUED", "RUNNING")) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (result != null) {
-                Text(result.getString("summary"), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.testTag("digest_summary"))
+                DailyDigestBody(result)
+                HorizontalDivider()
                 Text("已归纳${result.optLong("sourceCount")}条 · 第${digest.optLong("completedRevision")}版", style = MaterialTheme.typography.labelMedium)
                 digest.optionalString("generatedAt")?.let { timestamp ->
                     val formatted = runCatching { DateTimeFormatter.ofPattern("MM月dd日 HH:mm").withZone(ZoneId.of("Asia/Shanghai")).format(Instant.parse(timestamp)) }.getOrNull()
                     if (formatted != null) Text("生成于 $formatted", style = MaterialTheme.typography.labelSmall)
                 }
                 if (digest.optBoolean("outdated")) Text("有新内容待补齐，当前显示上一次总结。", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
-                result.optJSONArray("points")?.objects()?.forEachIndexed { index, point ->
-                    Text("${index + 1}. ${point.getString("text")}", style = MaterialTheme.typography.bodyMedium)
-                }
-                val labels = result.optJSONArray("categories")?.strings().orEmpty().map(::categoryLabel) + result.optJSONArray("keywords")?.strings().orEmpty()
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    labels.distinct().forEach { label -> Surface(color = MaterialTheme.colorScheme.secondaryContainer, shape = MaterialTheme.shapes.small) {
-                        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium)
-                    } }
-                }
                 val sources = result.optJSONArray("sources")?.length() ?: 0
                 if (sources > 0) TextButton(onClick = onSources, modifier = Modifier.testTag("digest_sources_toggle")) {
                     Text(if (sourcesVisible) "收起总结来源" else "查看总结来源（$sources）")
