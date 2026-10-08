@@ -71,7 +71,7 @@ public class SearchService {
             String media = "/api/v1/fragments/" + card.fragmentId() + "/media?kind=";
             result.add(new SearchResponse.Hit(card.fragmentId(), card.title() == null || card.title().isBlank() ? "未命名视频" : card.title(), card.author(), card.businessDate(), card.summary(), categories,
                     card.video() ? media + "VIDEO" : null, card.cover() ? media + "COVER" : null, ranked.score(), ranked.cosine(), ranked.literal(),
-                    new SearchResponse.Match(chunk.ordinal(), chunk.sourceKind(), chunk.sourceOrdinal(), chunk.startMs(), chunk.endMs(), chunk.content())));
+                    new SearchResponse.Match(chunk.ordinal(), chunk.sourceKind(), chunk.sourceOrdinal(), chunk.startMs(), chunk.endMs(), chunk.content()), card.introduction()));
         }
         checkDeadline(deadline); return new SearchResponse(result, scanned);
     }

@@ -21,7 +21,7 @@ class SearchServiceTest {
         search = new SearchService(data, model, defaults(), new ObjectMapper());
         float[] unit = new float[512]; unit[0] = 1; when(model.embedQuery(anyString())).thenReturn(Embedding.from(unit));
         when(data.countChunks(any(), anyString(), anyString())).thenReturn(1L);
-        when(data.card(any(), anyString(), anyString(), anyLong())).thenAnswer(call -> new SearchCard(call.getArgument(3), "资料", "作者", LocalDate.of(2026, 10, 6), "摘要", "[\"LEARNING\"]", false, false));
+        when(data.card(any(), anyString(), anyString(), anyLong())).thenAnswer(call -> new SearchCard(call.getArgument(3), "资料", "作者", LocalDate.of(2026, 10, 6), "摘要", "[\"LEARNING\"]", false, false, null));
     }
     @Test void groupsAcrossPageBoundariesAndRanksLiteralMatchesWithDeterministicTies() {
         when(data.page(any(), anyString(), anyString(), eq(0L), eq(-1), anyInt())).thenReturn(List.of(chunk(1, 0, .6, "第一段"), chunk(1, 1, .7, "第二段")));

@@ -49,12 +49,17 @@ class ChatTurnStoreIntegrationTest {
         assertThat(store.begin(owner, session, key, "导数资料").turn().state()).isEqualTo("FAILED"); assertThat(store.begin(owner, session, UUID.randomUUID().toString(), "下一轮").fresh()).isTrue();
     }
     @Test void completesAnswerAndOwnedCardAtomicallyAndRoundTripsWithoutLeaseSecrets() {
-        long owner = owner(), session = session(owner); var card = card(owner); var ticket = store.begin(owner, session, UUID.randomUUID().toString(), "查找导数").turn();
+        long owner = owner(), session = session(owner); var legacy = card(owner);
+        var card = new SearchResponse.Hit(legacy.fragmentId(), legacy.title(), legacy.author(), legacy.businessDate(), legacy.summary(), legacy.categories(),
+                legacy.videoMediaPath(), legacy.coverMediaPath(), legacy.score(), legacy.semanticScore(), legacy.literalMatch(), legacy.match(), "从切线理解变化率。");
+        var ticket = store.begin(owner, session, UUID.randomUUID().toString(), "查找导数").turn();
         assertThat(store.complete(ticket, result("已找到 [资料" + card.fragmentId() + "]", List.of(card)))).isTrue();
         assertThat(store.complete(ticket, result("晚到重复答案", List.of()))).isFalse(); var saved = store.get(owner, session, ticket.id()); assertThat(saved.state()).isEqualTo("COMPLETED");
         assertThat(saved.cards()).containsExactly(card); assertThat(saved.completedAt()).isBetween(Instant.now().minusSeconds(30), Instant.now()); assertThat(saved.modelRounds()).isEqualTo(2); assertThat(saved.toString()).doesNotContain("导数", ticket.leaseToken());
         long foreign = owner(); code(() -> store.get(foreign, session, ticket.id()), "CHAT_SESSION_NOT_FOUND");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM chat_turn_sources WHERE turn_id = ?", Integer.class, ticket.id())).isEqualTo(1);
+        jdbc.update("UPDATE chat_turn_sources SET snapshot = JSON_REMOVE(snapshot, '$.introduction') WHERE turn_id = ?", ticket.id());
+        assertThat(store.get(owner, session, ticket.id()).cards()).containsExactly(legacy);
     }
     @Test void rollsBackEarlierSourceWritesWhenLaterSourceIsForeignAndRejectsForgedMediaPaths() {
         long owner = owner(), foreign = owner(), session = session(owner); var own = card(owner); var secret = card(foreign); var ticket = store.begin(owner, session, UUID.randomUUID().toString(), "问题").turn();

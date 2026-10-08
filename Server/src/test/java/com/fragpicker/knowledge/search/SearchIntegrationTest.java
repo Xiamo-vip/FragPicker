@@ -52,6 +52,7 @@ class SearchIntegrationTest {
         var math = pending(owner, "数学课程：导数的定义和计算。通过切线斜率与极限理解微分，讲解求导公式和函数单调性。", "数学入门", "数学老师", "LEARNING");
         pending(owner, "家常菜教程：番茄炒鸡蛋的做法，食材准备、油温控制和调味步骤。", "菜谱", "厨房老师", "LIFESTYLE");
         pending(foreign, "数学课程：导数的定义和计算。通过切线斜率与极限理解微分，讲解求导公式和函数单调性。", "别人的数学资料", "数学老师", "LEARNING");
+        jdbc.update("UPDATE fragment_knowledge SET display_title='变化率入门', introduction='了解变化率。' WHERE fragment_id=?", math.fragmentId());
         var worker = new IndexWorker(indexes, model); for (int i = 0; i < 3; i++) assertThat(worker.runOnce()).isTrue();
         for (String kind : List.of("VIDEO", "COVER")) jdbc.update("INSERT INTO fragment_stored_media (fragment_id, user_id, kind, bucket, object_key, size_bytes, sha256, content_type, stored_at) VALUES (?, ?, ?, 'test-private', ?, 10, REPEAT('a', 64), ?, UTC_TIMESTAMP(3))", math.fragmentId(), owner.id(), kind, "test-only/" + kind, kind.equals("VIDEO") ? "video/mp4" : "image/jpeg");
         var response = post(owner, Map.of("query", "我想学习函数在某一点的瞬时变化率，找之前保存的数学学习资源", "limit", 5, "userId", foreign.id()));
@@ -59,6 +60,9 @@ class SearchIntegrationTest {
         var items = response.getBody().path("items"); assertThat(items.isEmpty()).isFalse();
         var first = items.get(0); assertThat(first.path("fragmentId").asLong()).isEqualTo(math.fragmentId()); assertThat(first.path("literalMatch").asBoolean()).isFalse();
         assertThat(first.path("semanticScore").asDouble()).isGreaterThan(.4); assertThat(first.path("summary").asText()).contains("导数"); assertThat(first.path("categories").get(0).asText()).isEqualTo("LEARNING");
+        assertThat(first.path("title").asText()).isEqualTo("变化率入门");
+        assertThat(first.path("introduction").asText()).isEqualTo("了解变化率。");
+        assertThat(first.path("summary").asText()).contains("函数单调性");
         assertThat(first.path("videoMediaPath").asText()).isEqualTo("/api/v1/fragments/" + math.fragmentId() + "/media?kind=VIDEO");
         assertThat(first.path("coverMediaPath").asText()).endsWith("kind=COVER"); assertThat(items.toString()).doesNotContain("别人的", "object_key", "test-only", "embedding", "video_url");
         System.out.println("Real HTTP + MySQL + ONNX semantic search: rate-of-change query returns owned derivative card; foreign owner excluded.");
