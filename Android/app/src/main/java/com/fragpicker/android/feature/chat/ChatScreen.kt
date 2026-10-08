@@ -100,7 +100,7 @@ fun ChatRoute(api: JsonApi, onOpen: (Long) -> Unit) {
                         SelectionContainer { Text(turn.getString("question"), Modifier.padding(16.dp)) }
                     }
                     if (turn.getString("state") == "COMPLETED") {
-                        SelectionContainer { Text(turn.optionalString("answer") ?: "回答已保存。") }
+                        MarkdownText(turn.optionalString("answer") ?: "回答已保存。", Modifier.testTag("chat_answer_${turn.getLong("turnId")}"))
                         if (turn.optBoolean("contextTruncated")) Text("本次对话仅包含部分较早上下文。", style = MaterialTheme.typography.labelSmall)
                         turn.optJSONArray("cards")?.objects()?.forEach { FragmentCard(api, it, onOpen) }
                     } else if (turn.getString("state") == "FAILED") {
@@ -116,7 +116,7 @@ fun ChatRoute(api: JsonApi, onOpen: (Long) -> Unit) {
                 if (state.turns.none { it.getLong("turnId") == pending.turnId }) Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.large) {
                     Text(pending.question, Modifier.padding(16.dp))
                 }
-                if (state.streamText.isNotBlank()) SelectionContainer { Text(state.streamText, modifier = Modifier.testTag("chat_stream")) }
+                if (state.streamText.isNotBlank()) MarkdownText(state.streamText, Modifier.testTag("chat_stream"))
             } }
             state.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("chat_error")) } }
         }
