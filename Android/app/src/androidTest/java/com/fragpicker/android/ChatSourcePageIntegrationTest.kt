@@ -39,6 +39,8 @@ class ChatSourcePageIntegrationTest {
         compose.onNodeWithTag("chat_messages").performScrollToNode(hasTestTag("fragment_$id"))
         compose.onNodeWithTag("fragment_$id").performClick()
         compose.waitUntil(20_000) { compose.onAllNodesWithTag("detail_play").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("detail_page").performScrollToNode(hasTestTag("detail_tab_2"))
+        compose.onNodeWithTag("detail_tab_2").performClick()
         compose.onNodeWithTag("detail_page").performScrollToNode(hasTestTag("transcript_seek"))
         compose.onNodeWithTag("transcript_seek").assertIsDisplayed()
         compose.onNodeWithContentDescription("返回").performClick()

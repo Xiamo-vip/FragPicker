@@ -38,6 +38,8 @@ class DetailIntegrationTest {
         compose.onNodeWithTag("detail_error").assertDoesNotExist()
         compose.onNodeWithTag("detail_play").assertIsNotEnabled()
         compose.onNodeWithTag("nav_FEED").assertDoesNotExist()
+        compose.onNodeWithTag("detail_page").performScrollToNode(hasTestTag("detail_tab_2"))
+        compose.onNodeWithTag("detail_tab_2").performClick()
         compose.onNodeWithText("转写完成后将在这里显示原文。").performScrollTo().assertIsDisplayed()
         compose.activityRule.scenario.recreate()
         compose.waitUntil(15_000) { compose.onAllNodesWithText("投喂记录").fetchSemanticsNodes().isNotEmpty() }

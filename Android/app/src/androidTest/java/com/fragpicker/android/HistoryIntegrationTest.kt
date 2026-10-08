@@ -41,6 +41,8 @@ class HistoryIntegrationTest {
         compose.onNodeWithTag("history_list").performScrollToNode(hasTestTag("fragment_${ids.first()}"))
         compose.onNodeWithTag("fragment_${ids.first()}").performClick()
         compose.waitUntil(15_000) { compose.onAllNodesWithTag("detail_play").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("detail_page").performScrollToNode(hasTestTag("detail_metadata_toggle"))
+        compose.onNodeWithTag("detail_metadata_toggle").performClick()
         compose.onNodeWithTag("detail_page").performScrollToNode(hasText("日历测试 0"))
         compose.onNodeWithText("日历测试 0").assertIsDisplayed()
         compose.onNodeWithContentDescription("返回").performClick()

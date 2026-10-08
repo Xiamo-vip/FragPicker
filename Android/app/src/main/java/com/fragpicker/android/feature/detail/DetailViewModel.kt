@@ -11,13 +11,16 @@ import java.net.URI
 data class DetailState(val loading: Boolean = true, val content: JSONObject? = null,
     val segments: List<JSONObject> = emptyList(), val cursor: JSONObject? = null,
     val paging: Boolean = false, val available: Boolean = false, val kind: String = "SENTENCE",
-    val mediaLoading: Boolean = false, val videoUrl: String? = null, val videoRevision: Int = 0, val error: String? = null)
+    val mediaLoading: Boolean = false, val videoUrl: String? = null, val videoRevision: Int = 0, val error: String? = null,
+    val chapters: List<VideoChapter> = emptyList(), val chapterCursor: JSONObject? = null,
+    val chaptersLoading: Boolean = false, val chapterError: String? = null)
 
 class DetailViewModel(private val api: JsonApi, val id: Long) : ViewModel() {
     private val mutable = MutableStateFlow(DetailState())
     val state = mutable.asStateFlow()
     private var transcriptJob: Job? = null
     private var contentJob: Job? = null
+    private var chapterJob: Job? = null
     private var generation = 0
     init { refresh() }
     fun refresh() {
@@ -28,8 +31,35 @@ class DetailViewModel(private val api: JsonApi, val id: Long) : ViewModel() {
                 val content = api.request("GET", "/api/v1/fragments/$id/content")
                 mutable.value = state.value.copy(loading = false, content = content)
                 transcript(state.value.kind)
+                loadChapters(first = true)
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { mutable.value = state.value.copy(loading = false, error = failureMessage(failure)) }
+        }
+    }
+    fun loadChapters(first: Boolean = false) {
+        if (!first && (state.value.chaptersLoading || state.value.chapterCursor == null)) return
+        chapterJob?.cancel()
+        mutable.value = state.value.copy(chaptersLoading = true, chapterError = null)
+        chapterJob = viewModelScope.launch {
+            try {
+                var cursor = if (first) null else state.value.chapterCursor
+                val collected = (if (first) emptyList() else state.value.chapters).associateBy { it.ordinal }.toMutableMap()
+                // Bound each automatic batch; very long material can load the remaining chapters on demand.
+                for (page in 0 until 10) {
+                    val ordinal = cursor?.getInt("ordinal") ?: 0
+                    val offset = cursor?.getInt("offset") ?: 0
+                    val result = api.request("GET", "/api/v1/fragments/$id/transcript?kind=KEY_POINT&ordinal=$ordinal&offset=$offset&limit=20")
+                    result.getJSONArray("items").objects().filter { !it.optBoolean("continuation") }.forEach {
+                        val number = it.getInt("ordinal")
+                        collected[number] = VideoChapter(number, it.getLong("startMs"), it.getLong("endMs"), it.getString("text"))
+                    }
+                    cursor = result.optionalObject("nextCursor")
+                    if (cursor == null) break
+                }
+                mutable.value = state.value.copy(chapters = collected.values.sortedWith(compareBy({ it.startMs }, { it.ordinal })),
+                    chapterCursor = cursor, chaptersLoading = false)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (failure: Exception) { mutable.value = state.value.copy(chaptersLoading = false, chapterError = failureMessage(failure)) }
         }
     }
     fun transcript(kind: String) {

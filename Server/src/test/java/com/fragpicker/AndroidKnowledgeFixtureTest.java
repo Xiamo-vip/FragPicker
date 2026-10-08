@@ -59,6 +59,7 @@ class AndroidKnowledgeFixtureTest {
         knowledge.insert(item.fragmentId(), owner, 3000, summary, "[]");
         jdbc.update("UPDATE fragment_knowledge SET enriched_summary = ?, bullet_points = JSON_ARRAY(?), categories = JSON_ARRAY('LEARNING'), enrichment_model = 'fixture', enriched_at = UTC_TIMESTAMP(3) WHERE fragment_id = ?", summary, summary, item.fragmentId());
         jdbc.update("INSERT INTO fragment_sentences (fragment_id,user_id,ordinal,paragraph_id,speaker_id,sentence_id,start_ms,end_ms,content) VALUES (?,?,0,0,'1',0,0,3000,?)", item.fragmentId(), owner, summary);
+        jdbc.update("INSERT INTO fragment_key_points (fragment_id,user_id,ordinal,sentence_id,start_ms,end_ms,content) VALUES (?,?,0,0,0,1500,'通过切线斜率理解导数'),(?,?,1,0,1500,3000,'用差商极限求导')", item.fragmentId(), owner, item.fragmentId(), owner);
         jdbc.update("UPDATE ingestion_jobs SET stage = 'INDEX_PENDING' WHERE id = ?", item.jobId());
         jdbc.update("UPDATE fragments SET status = 'INDEX_PENDING' WHERE id = ?", item.fragmentId());
         jdbc.update("INSERT INTO fragment_video_metadata (fragment_id,user_id,title,video_url,parsed_at) VALUES (?,?,?,'https://example.com/test-only.mp4',UTC_TIMESTAMP(3))", item.fragmentId(), owner, title);
