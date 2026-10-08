@@ -69,7 +69,7 @@ class HomeIntegrationTest {
         compose.onNodeWithTag("home_summary").assertTextEquals(expected)
         compose.onNodeWithText("其他人的秘密每日总结").assertDoesNotExist()
         compose.onNodeWithTag("nav_SETTINGS").performClick()
-        compose.onNodeWithText("深色").performClick()
+        chooseAppearance(true)
         compose.onNodeWithTag("nav_HOME").performClick()
         compose.onNodeWithTag("home_list").performScrollToNode(hasTestTag("home_summary"))
         compose.onNodeWithTag("home_summary").assertTextEquals(expected)
@@ -77,6 +77,15 @@ class HomeIntegrationTest {
         compose.onNodeWithTag("home_list").performScrollToNode(hasTestTag("home_history"))
         compose.onNodeWithTag("home_history").performClick()
         compose.onNodeWithTag("nav_HISTORY").assertIsSelected()
+    }
+    private fun chooseAppearance(dark: Boolean) {
+        val switch = compose.onNodeWithTag("theme_switch").performScrollTo()
+        val matches = runCatching { if (dark) switch.assertIsOn() else switch.assertIsOff() }.isSuccess
+        if (!matches) switch.performClick()
+        compose.waitUntil(10_000) { runCatching {
+            switch.assertIsEnabled()
+            if (dark) switch.assertIsOn() else switch.assertIsOff()
+        }.isSuccess }
     }
     private fun savePreview() {
         val bitmap=compose.onRoot().captureToImage().asAndroidBitmap()

@@ -52,27 +52,30 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun FragmentsPickerTheme(mode: ThemeMode, content: @Composable () -> Unit) {
+    val systemDark = isSystemInDarkTheme()
     val dark = when (mode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.SYSTEM -> systemDark
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            (view.context as? Activity)?.window?.let { window ->
-                WindowCompat.getInsetsController(window, view).apply {
-                    isAppearanceLightStatusBars = !dark
-                    isAppearanceLightNavigationBars = !dark
+    ThemeRevealHost(dark, systemDark) { displayedDark, barsDark ->
+        val view = LocalView.current
+        if (!view.isInEditMode) {
+            SideEffect {
+                (view.context as? Activity)?.window?.let { window ->
+                    WindowCompat.getInsetsController(window, view).apply {
+                        isAppearanceLightStatusBars = !barsDark
+                        isAppearanceLightNavigationBars = !barsDark
+                    }
                 }
             }
         }
-    }
-    val embers = rememberEmberAnimation(dark)
-    CompositionLocalProvider(LocalDarkTheme provides dark, LocalEmberAnimation provides embers) {
-        MaterialTheme(colorScheme = if (dark) DarkColors else LightColors) {
-            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
-                Box(Modifier.fillMaxSize().appBackground()) { content() }
+        val embers = rememberEmberAnimation(displayedDark)
+        CompositionLocalProvider(LocalDarkTheme provides displayedDark, LocalEmberAnimation provides embers) {
+            MaterialTheme(colorScheme = if (displayedDark) DarkColors else LightColors) {
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
+                    Box(Modifier.fillMaxSize().appBackground()) { content() }
+                }
             }
         }
     }

@@ -64,13 +64,13 @@ class DailyDigestIntegrationTest {
             compose.onNodeWithTag("digest_confirm").assertDoesNotExist()
         }
         compose.onNodeWithTag("nav_SETTINGS").performClick()
-        compose.onNodeWithText("深色").performScrollTo().performClick()
+        chooseAppearance(true)
         compose.onNodeWithTag("nav_HISTORY").performClick()
         compose.waitUntil(20_000) { compose.onAllNodesWithTag("digest_summary").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("history_list").performScrollToNode(hasTestTag("digest_summary"))
         savePreview("daily-digest-dark.png")
         compose.onNodeWithTag("nav_SETTINGS").performClick()
-        compose.onNodeWithText("浅色").performScrollTo().performClick()
+        chooseAppearance(false)
     }
     @Test fun persistedUnknownSubmissionReconcilesSameRequestAfterRecreation() {
         assumeTrue(args.getString("realBackend") == "true" && args.getString("digestLive") == "true")
@@ -103,6 +103,15 @@ class DailyDigestIntegrationTest {
         compose.waitUntil(20_000) { saved.load(today) == null }
         assertEquals(1L, runBlocking { api.request("GET", "/api/v1/daily-digests/$today").getLong("requestedRevision") })
         compose.onNodeWithTag("digest_confirm").assertDoesNotExist()
+    }
+    private fun chooseAppearance(dark: Boolean) {
+        val switch = compose.onNodeWithTag("theme_switch").performScrollTo()
+        val matches = runCatching { if (dark) switch.assertIsOn() else switch.assertIsOff() }.isSuccess
+        if (!matches) switch.performClick()
+        compose.waitUntil(10_000) { runCatching {
+            switch.assertIsEnabled()
+            if (dark) switch.assertIsOn() else switch.assertIsOff()
+        }.isSuccess }
     }
     private fun savePreview(name: String) {
         if (android.os.Build.VERSION.SDK_INT < 29) return

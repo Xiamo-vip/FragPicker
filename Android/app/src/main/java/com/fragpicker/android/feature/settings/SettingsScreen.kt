@@ -10,9 +10,16 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.fragpicker.android.BuildConfig
-import com.fragpicker.android.core.theme.ThemeMode
+import com.fragpicker.android.core.theme.*
 import com.fragpicker.android.feature.auth.LoginUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -20,6 +27,9 @@ import com.fragpicker.android.feature.auth.LoginUiState
 fun SettingsScreen(mode: ThemeMode, onMode: (ThemeMode) -> Unit, account: LoginUiState,
                    onLogout: () -> Unit, onBack: (() -> Unit)? = null) {
     var confirmLogout by remember { mutableStateOf(false) }
+    var themeAnchor by remember { mutableStateOf(Offset.Zero) }
+    val reveal = LocalThemeReveal.current
+    val changeMode: (ThemeMode) -> Unit = { option -> reveal?.change?.invoke(option, themeAnchor, onMode) ?: onMode(option) }
     Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, topBar = {
         TopAppBar(title = { Text("设置") }, navigationIcon = {
             onBack?.let { IconButton(onClick = it) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") } }
@@ -31,16 +41,20 @@ fun SettingsScreen(mode: ThemeMode, onMode: (ThemeMode) -> Unit, account: LoginU
             Text("外观", style = MaterialTheme.typography.titleMedium)
             ElevatedCard(shape = MaterialTheme.shapes.extraLarge) {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Rounded.Palette, null, tint = MaterialTheme.colorScheme.primary)
-                        Text("主题样式", style = MaterialTheme.typography.titleMedium)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("主题样式", style = MaterialTheme.typography.titleMedium)
+                            Text(mode.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(checked = LocalDarkTheme.current, onCheckedChange = { changeMode(if (it) ThemeMode.DARK else ThemeMode.LIGHT) },
+                            enabled = reveal?.busy != true, modifier = Modifier.testTag("theme_switch").semantics { contentDescription = "深色模式" }
+                                .onGloballyPositioned { themeAnchor = it.boundsInWindow().center })
                     }
                     Spacer(Modifier.height(12.dp))
-                    ThemeMode.entries.forEach { option ->
-                        FilterChip(selected = mode == option, onClick = { onMode(option) },
-                            label = { Text(option.label) }, modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = if (mode == option) { { Icon(Icons.Rounded.Check, null) } } else null)
-                    }
+                    FilterChip(selected = mode == ThemeMode.SYSTEM, onClick = { changeMode(ThemeMode.SYSTEM) }, enabled = reveal?.busy != true,
+                        label = { Text("跟随系统") }, modifier = Modifier.fillMaxWidth().testTag("theme_system"),
+                        leadingIcon = if (mode == ThemeMode.SYSTEM) { { Icon(Icons.Rounded.Check, null) } } else null)
                     Text("外观选择会保存在此设备，跟随系统可自动切换。",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

@@ -33,7 +33,8 @@ class NavigationTest {
         compose.onNodeWithText("和记忆聊一聊").assertIsDisplayed()
         compose.onNodeWithTag("nav_SETTINGS").performClick().assertIsSelected()
         compose.onNodeWithText("主题样式").assertIsDisplayed()
-        compose.onNodeWithText("深色").performClick().assertIsSelected()
+        compose.onNodeWithTag("theme_switch").performClick()
+        compose.waitUntil(10_000) { runCatching { compose.onNodeWithTag("theme_switch").assertIsEnabled().assertIsOn() }.isSuccess }
         compose.onNodeWithTag("nav_FEED").performClick().assertIsSelected()
         compose.onNodeWithTag("nav_HISTORY").performClick().assertIsSelected()
         savePreview("liquid-dark.png")
