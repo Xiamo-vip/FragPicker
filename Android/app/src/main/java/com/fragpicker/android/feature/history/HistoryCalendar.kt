@@ -40,10 +40,11 @@ fun HistoryCalendar(month: YearMonth, date: String, days: Map<String, JSONObject
         if (heading != null && !expanded) Box(Modifier.fillMaxWidth().padding(end = 72.dp).heightIn(min = 56.dp), contentAlignment = Alignment.CenterStart) {
             Text(heading, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.testTag("history_heading"))
         }
-        val width by animateDpAsState(if (expanded) cardWidth else 56.dp, tween(320, easing = FastOutSlowInEasing), label = "calendar_width")
+        val width = if (expanded) cardWidth else 56.dp
         val radius by animateDpAsState(if (expanded) 24.dp else 28.dp, tween(320), label = "calendar_radius")
         val shape = RoundedCornerShape(radius)
-        Surface(Modifier.width(width).clip(shape).animateContentSize(tween(300), alignment = Alignment.TopEnd).testTag("history_calendar"),
+        // One owner for both bounds, measured at the final width before expansion.
+        Surface(Modifier.testTag("history_calendar").clip(shape).animateContentSize(tween(320), alignment = Alignment.TopEnd).width(width),
             shape = shape, color = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.primaryContainer,
             tonalElevation = 2.dp) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -55,8 +56,7 @@ fun HistoryCalendar(month: YearMonth, date: String, days: Map<String, JSONObject
                         Icon(Icons.Rounded.CalendarMonth, if (expanded) "收起日历" else "展开日历", tint = MaterialTheme.colorScheme.primary)
                     }
                 }
-                AnimatedVisibility(expanded, enter = expandVertically(expandFrom = Alignment.Top, animationSpec = tween(300)) + fadeIn(tween(220, 90)),
-                    exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(250)) + fadeOut(tween(150))) {
+                if (expanded) {
                     Column(Modifier.requiredWidth(cardWidth).padding(horizontal = 10.dp).padding(bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                             IconButton(enabled = month.year > 1000 || month.monthValue > 1, onClick = { onMonth(month.minusMonths(1)) }) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "上个月") }

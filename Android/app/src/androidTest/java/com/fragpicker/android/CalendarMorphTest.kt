@@ -30,15 +30,34 @@ class CalendarMorphTest {
         assertEquals("Calendar ball shares the heading row", heading.center.y, ball.center.y, 2f)
         compose.onNodeWithTag("day_2026-10-01").assertDoesNotExist()
         compose.onNodeWithTag("calendar_toggle").performClick()
-        compose.mainClock.advanceTimeBy(800)
+        var previous = ball
+        repeat(24) {
+            compose.mainClock.advanceTimeBy(16)
+            val frame = compose.onNodeWithTag("history_calendar").fetchSemanticsNode().boundsInRoot
+            assertTrue("Width expands in one direction", frame.width >= previous.width - 1f)
+            assertTrue("Height expands in one direction", frame.height >= previous.height - 1f)
+            assertEquals("Right anchor remains fixed during motion", ball.right, frame.right, 2f)
+            previous = frame
+        }
+        compose.mainClock.advanceTimeBy(416)
         val card = compose.onNodeWithTag("history_calendar").fetchSemanticsNode().boundsInRoot
+        assertEquals("Width settles without a second stretch", previous.width, card.width, 1f)
+        assertEquals("Height settles without a second stretch", previous.height, card.height, 1f)
         assertTrue(card.width > ball.width * 3)
         assertEquals("Expansion keeps the right anchor", ball.right, card.right, 2f)
         val toggle = compose.onNodeWithTag("calendar_toggle").fetchSemanticsNode().boundsInRoot
         assertEquals("Toggle stays at the original ball", ball.center.x, toggle.center.x, 2f)
         compose.onNodeWithTag("day_2026-10-02").assert(hasStateDescription("尚无总结"))
         compose.onNodeWithTag("calendar_toggle").performClick()
-        compose.mainClock.advanceTimeBy(800)
+        previous = card
+        repeat(24) {
+            compose.mainClock.advanceTimeBy(16)
+            val frame = compose.onNodeWithTag("history_calendar").fetchSemanticsNode().boundsInRoot
+            assertTrue("Width retracts in one direction", frame.width <= previous.width + 1f)
+            assertTrue("Height retracts in one direction", frame.height <= previous.height + 1f)
+            previous = frame
+        }
+        compose.mainClock.advanceTimeBy(416)
         compose.onNodeWithTag("day_2026-10-01").assertDoesNotExist()
         assertEquals(ball.width, compose.onNodeWithTag("history_calendar").fetchSemanticsNode().boundsInRoot.width, 2f)
     }
