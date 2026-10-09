@@ -21,7 +21,7 @@ try {
             if ([string]::IsNullOrWhiteSpace($line) -or $line.TrimStart().StartsWith('#')) { continue }
             if ($line -notmatch '^\s*([A-Z][A-Z0-9_]*)\s*=(.*)$') { throw 'Invalid environment file assignment; values were not logged' }
             $name = $Matches[1]; $value = $Matches[2].Trim()
-            if ($name -notmatch '^(DB_|JWT_|PARSEVIDEO_|INGESTION_|OSS_|TINGWU_|ALIBABA_CLOUD_|AI_CHAT_|KNOWLEDGE_|DIGEST_|MEDIA_|INDEX_|SEARCH_|CHAT_|SCHEDULER_|SERVER_PORT$)') {
+            if ($name -notmatch '^(DB_|JWT_|PARSEVIDEO_|INGESTION_|TRANSCRIPTION_|OSS_|TINGWU_|ALIBABA_CLOUD_|AI_CHAT_|KNOWLEDGE_|DIGEST_|MEDIA_|INDEX_|SEARCH_|CHAT_|SCHEDULER_|SERVER_PORT$)') {
                 throw "Unsupported application variable: $name"
             }
             if ($seen.ContainsKey($name)) { throw "Duplicate environment variable: $name" }; $seen[$name] = $true
